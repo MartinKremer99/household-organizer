@@ -21,7 +21,7 @@ Start the development server:
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3001](http://localhost:3001). Port 3001 is reserved for this app so it does not collide with whatever is already on 3000.
 
 ## Checks
 
