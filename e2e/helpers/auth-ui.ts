@@ -6,11 +6,16 @@ import {
   type RegisteredUser,
 } from "./users";
 
-export async function openUserContext(browser: Browser): Promise<{
+export async function openUserContext(
+  browser: Browser,
+  options?: { permissions?: ("clipboard-read" | "clipboard-write")[] },
+): Promise<{
   context: BrowserContext;
   page: Page;
 }> {
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    permissions: options?.permissions,
+  });
   const page = await context.newPage();
   return { context, page };
 }

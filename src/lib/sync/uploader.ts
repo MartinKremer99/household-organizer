@@ -1,13 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   CatalogOutboxOperationType,
+  HouseholdOutboxOperationType,
   InventoryAllocationPayload,
   OutboxOperationType,
   PendingOperation,
   PutAwayPurchasedStockPayload,
   ShoppingOutboxOperationType,
 } from "@/lib/db";
-import { isInventoryCommandPayload, isPutAwayPurchasedStockPayload } from "@/lib/db";
+import {
+  isHouseholdCommandPayload,
+  isInventoryCommandPayload,
+  isPutAwayPurchasedStockPayload,
+} from "@/lib/db";
 import { createClient } from "@/lib/supabase/client";
 import { complete, listPending, markAttempt, markFailed } from "./outbox";
 
@@ -120,6 +125,8 @@ const SHOPPING_TYPES = new Set<OutboxOperationType>([
   "MARK_FREE_TEXT_STORED",
 ]);
 
+const HOUSEHOLD_TYPES = new Set<OutboxOperationType>(["RENAME_HOUSEHOLD"]);
+
 function isCatalogType(
   type: OutboxOperationType,
 ): type is CatalogOutboxOperationType {
@@ -130,6 +137,12 @@ function isShoppingType(
   type: OutboxOperationType,
 ): type is ShoppingOutboxOperationType {
   return SHOPPING_TYPES.has(type);
+}
+
+function isHouseholdType(
+  type: OutboxOperationType,
+): type is HouseholdOutboxOperationType {
+  return HOUSEHOLD_TYPES.has(type);
 }
 
 function isValidPutAwayPayload(
@@ -217,6 +230,15 @@ async function uploadOne(
         error: { code: "invalid_operation", message: "shopping payload is invalid" },
       };
     }
+  } else if (isHouseholdType(operation.operation_type)) {
+    if (!isHouseholdCommandPayload(operation.payload)) {
+      await markFailed(householdId, operation.operation_id, "invalid_operation");
+      return {
+        kind: "stop",
+        stop_reason: "business_rejection",
+        error: { code: "invalid_operation", message: "household payload is invalid" },
+      };
+    }
   } else if (
     !isInventoryCommandPayload(operation.payload) ||
     !hasValidAllocations(operation.payload.allocations)
@@ -259,6 +281,13 @@ async function uploadOne(
             })
           : isShoppingType(operation.operation_type)
             ? await supabase.rpc("apply_shopping_command", {
+                p_operation_id: operation.operation_id,
+                p_operation_type: operation.operation_type,
+                p_payload: operation.payload,
+                p_client_created_at: clientCreatedAt,
+              })
+          : isHouseholdType(operation.operation_type)
+            ? await supabase.rpc("apply_household_command", {
                 p_operation_id: operation.operation_id,
                 p_operation_type: operation.operation_type,
                 p_payload: operation.payload,

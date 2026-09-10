@@ -59,7 +59,7 @@ test(
 
     await addFreeTextToShopping(page, "Paper towels", 1);
     await expect(page.getByRole("heading", { name: "Paper towels" })).toBeVisible();
-    await expect(page.getByText("Note")).toBeVisible();
+    await expect(page.getByText("Note", { exact: true })).toBeVisible();
     await markPurchased(page, "Paper towels");
     await openPurchasedTab(page);
     await markStored(page, "Paper towels");

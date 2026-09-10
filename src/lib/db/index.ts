@@ -12,7 +12,9 @@ export type {
   CatalogOutboxOperationType,
   Category,
   Household,
+  HouseholdCommandPayload,
   HouseholdMember,
+  HouseholdOutboxOperationType,
   InventoryAllocationPayload,
   InventoryCommandPayload,
   InventoryLot,
@@ -36,6 +38,7 @@ export type {
 } from "./types";
 export {
   isCatalogCommandPayload,
+  isHouseholdCommandPayload,
   isInventoryCommandPayload,
   isPutAwayPurchasedStockPayload,
 } from "./types";

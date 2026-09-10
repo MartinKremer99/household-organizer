@@ -144,11 +144,17 @@ export type ShoppingCommandPayload = {
   client_created_at?: string;
 };
 
+export type HouseholdCommandPayload = {
+  name: string;
+  client_created_at?: string;
+};
+
 export type OutboxPayload =
   | InventoryCommandPayload
   | PutAwayPurchasedStockPayload
   | CatalogCommandPayload
-  | ShoppingCommandPayload;
+  | ShoppingCommandPayload
+  | HouseholdCommandPayload;
 
 export function isInventoryCommandPayload(
   payload: OutboxPayload,
@@ -176,6 +182,18 @@ export function isCatalogCommandPayload(
   return "id" in payload && typeof payload.id === "string" && !("allocations" in payload);
 }
 
+export function isHouseholdCommandPayload(
+  payload: OutboxPayload,
+): payload is HouseholdCommandPayload {
+  return (
+    "name" in payload &&
+    typeof payload.name === "string" &&
+    !("id" in payload) &&
+    !("allocations" in payload) &&
+    !("product_id" in payload)
+  );
+}
+
 export type CatalogOutboxOperationType =
   | "CREATE_CATEGORY"
   | "RENAME_CATEGORY"
@@ -196,11 +214,14 @@ export type ShoppingOutboxOperationType =
   | "CONSUME_PURCHASED_STOCK"
   | "MARK_FREE_TEXT_STORED";
 
+export type HouseholdOutboxOperationType = "RENAME_HOUSEHOLD";
+
 export type OutboxOperationType =
   | "INVENTORY_DELTA"
   | "PUT_AWAY_PURCHASED_STOCK"
   | CatalogOutboxOperationType
-  | ShoppingOutboxOperationType;
+  | ShoppingOutboxOperationType
+  | HouseholdOutboxOperationType;
 
 export type PendingOperation = {
   id: string;

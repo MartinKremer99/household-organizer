@@ -195,6 +195,22 @@ describe("applyHouseholdSnapshot", () => {
     });
   });
 
+  it("overwrites the local household name from a later snapshot", async () => {
+    await applyHouseholdSnapshot(snapshot());
+    expect(await householdRepository.getById(HOUSEHOLD_A)).toMatchObject({
+      name: "Home",
+    });
+
+    await applyHouseholdSnapshot(
+      snapshot({ household: household(HOUSEHOLD_A, "Renamed Home") }),
+    );
+
+    expect(await householdRepository.getById(HOUSEHOLD_A)).toMatchObject({
+      name: "Renamed Home",
+      join_code: "ABCDEFGHIJ",
+    });
+  });
+
   it("accepts an empty household with seed catalog and no lots", async () => {
     const empty = snapshot({
       products: [],

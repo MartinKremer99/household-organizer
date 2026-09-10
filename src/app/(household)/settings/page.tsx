@@ -1,34 +1,26 @@
-import Link from "next/link";
-import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { HouseholdSettingsScreen } from "@/features/household/ui/household-settings-screen";
+import { signOut } from "@/lib/supabase/actions";
+import { createClient } from "@/lib/supabase/server";
 import { requireHouseholdId } from "./load-household";
 
 export default async function SettingsPage() {
-  await requireHouseholdId();
+  const householdId = await requireHouseholdId();
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  const email = data.user?.email ?? "";
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
-      <Link
-        href="/settings/products"
-        aria-label="Products"
-        className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-      >
-        <Card title="Products">Manage household products.</Card>
-      </Link>
-      <Link
-        href="/settings/categories"
-        aria-label="Categories"
-        className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-      >
-        <Card title="Categories">Manage household categories.</Card>
-      </Link>
-      <Link
-        href="/settings/locations"
-        aria-label="Locations"
-        className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-      >
-        <Card title="Locations">Manage household locations.</Card>
-      </Link>
-    </div>
+    <HouseholdSettingsScreen
+      householdId={householdId}
+      email={email}
+      signOutAction={
+        <form action={signOut}>
+          <Button type="submit" variant="secondary">
+            Sign out
+          </Button>
+        </form>
+      }
+    />
   );
 }

@@ -354,6 +354,36 @@ describe("uploadPendingOperations", () => {
     expect(await getByOperationId(HOUSEHOLD_A, "op-put")).toBeNull();
   });
 
+  it("uploads a household rename through apply_household_command", async () => {
+    await enqueue(
+      createPendingOperation({
+        household_id: HOUSEHOLD_A,
+        operation_id: "op-rename",
+        operation_type: "RENAME_HOUSEHOLD",
+        payload: { name: "New Home" },
+        created_at: "2026-09-10T10:00:00.000Z",
+      }),
+    );
+    const { client, calls } = mockClient({});
+
+    const result = await uploadPendingOperations(HOUSEHOLD_A, { supabase: client });
+
+    expect(result.stop_reason).toBe("completed");
+    expect(result.uploaded_operation_ids).toEqual(["op-rename"]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.fn).toBe("apply_household_command");
+    expect(calls[0]?.args).toEqual({
+      p_operation_id: "op-rename",
+      p_operation_type: "RENAME_HOUSEHOLD",
+      p_payload: { name: "New Home" },
+      p_client_created_at: "2026-09-10T10:00:00.000Z",
+    });
+    expect(calls[0]?.args).not.toHaveProperty("p_user_id");
+    expect(calls[0]?.args).not.toHaveProperty("p_household_id");
+    expect(calls.map((call) => call.fn)).not.toContain("apply_inventory_command");
+    expect(await getByOperationId(HOUSEHOLD_A, "op-rename")).toBeNull();
+  });
+
   it("treats bodyless 401 as a transient error", async () => {
     await enqueue(createPendingOperation(pendingInput()));
     const { client } = mockClient({

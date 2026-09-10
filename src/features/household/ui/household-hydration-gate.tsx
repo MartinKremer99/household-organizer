@@ -19,10 +19,12 @@ export function HouseholdHydrationGate({
   userId,
   children,
   api,
+  onReady,
 }: {
   userId: string;
   children: ReactNode;
   api?: Partial<HouseholdHydrationGateApi>;
+  onReady?: (household: { name: string }) => void;
 }) {
   const ensure = api?.ensureLocalHousehold ?? defaults.ensureLocalHousehold;
   const [attempt, setAttempt] = useState(0);
@@ -33,12 +35,15 @@ export function HouseholdHydrationGate({
     void ensure({ userId }).then((next) => {
       if (!cancelled) {
         setResult(next);
+        if (next.ok) {
+          onReady?.(next.household);
+        }
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [ensure, userId, attempt]);
+  }, [ensure, userId, attempt, onReady]);
 
   if (result?.ok) {
     return children;

@@ -32,6 +32,24 @@ describe("HouseholdHydrationGate", () => {
     expect(ensure).toHaveBeenCalledWith({ userId: "user-1" });
   });
 
+  it("calls onReady with the household from a successful ensure", async () => {
+    const ensure = vi.fn().mockResolvedValue({ ok: true, household: HOUSEHOLD });
+    const onReady = vi.fn();
+
+    render(
+      <HouseholdHydrationGate
+        userId="user-1"
+        api={{ ensureLocalHousehold: ensure }}
+        onReady={onReady}
+      >
+        <p>Ready</p>
+      </HouseholdHydrationGate>,
+    );
+
+    expect(await screen.findByText("Ready")).toBeTruthy();
+    expect(onReady).toHaveBeenCalledWith(HOUSEHOLD);
+  });
+
   it("shows retry when ensure fails and retries on click", async () => {
     const ensure = vi
       .fn()
