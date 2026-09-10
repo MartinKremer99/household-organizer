@@ -7,4 +7,12 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "src"),
     },
   },
+  test: {
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "e2e/**",
+    ],
+  },
 });
