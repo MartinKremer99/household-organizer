@@ -1,8 +1,11 @@
 import { getHouseholdDb } from "@/lib/db";
 import type {
+  InventoryAllocationPayload,
+  InventoryCommandPayload,
   OutboxOperationType,
   OutboxPayload,
   PendingOperation,
+  PutAwayPurchasedStockPayload,
 } from "@/lib/db";
 import { pendingOperationRepository } from "./pending-operation-repository";
 
@@ -31,20 +34,44 @@ export function createPendingOperation(
   };
 }
 
-function allocationIdentity(allocation: OutboxPayload["allocations"][number]): string {
+function isInventoryCommandPayload(
+  payload: OutboxPayload,
+): payload is InventoryCommandPayload {
+  return "allocations" in payload && Array.isArray(payload.allocations);
+}
+
+function isPutAwayPayload(
+  payload: OutboxPayload,
+): payload is PutAwayPurchasedStockPayload {
+  return "quantity" in payload && typeof payload.quantity === "number";
+}
+
+function allocationIdentity(allocation: InventoryAllocationPayload): string {
   const expiration =
     "expiration_date" in allocation
       ? JSON.stringify(allocation.expiration_date ?? null)
       : "ABSENT";
-  return `${allocation.inventory_lot_id}|${allocation.delta}|${expiration}`;
+  const location = allocation.location_id ?? "ABSENT";
+  return `${allocation.inventory_lot_id}|${allocation.delta}|${expiration}|${location}`;
 }
 
 function payloadsEqual(left: OutboxPayload, right: OutboxPayload): boolean {
-  if (
-    left.product_id !== right.product_id ||
-    left.location_id !== right.location_id ||
-    left.operation_type !== right.operation_type
-  ) {
+  if (left.product_id !== right.product_id || left.location_id !== right.location_id) {
+    return false;
+  }
+
+  if (isPutAwayPayload(left) && isPutAwayPayload(right)) {
+    return (
+      left.quantity === right.quantity &&
+      (left.expiration_date ?? null) === (right.expiration_date ?? null)
+    );
+  }
+
+  if (!isInventoryCommandPayload(left) || !isInventoryCommandPayload(right)) {
+    return false;
+  }
+
+  if (left.operation_type !== right.operation_type) {
     return false;
   }
 

@@ -1,8 +1,7 @@
-export default function ShoppingPage() {
-  return (
-    <div className="flex flex-col gap-3">
-      <h1 className="text-xl font-semibold tracking-tight">Shopping</h1>
-      <p className="text-sm text-foreground/80">Nothing to buy.</p>
-    </div>
-  );
+import { ShoppingOverviewScreen } from "@/features/shopping/ui/shopping-overview-screen";
+import { requireHouseholdActor } from "../settings/load-household";
+
+export default async function ShoppingPage() {
+  const { householdId, userId } = await requireHouseholdActor();
+  return <ShoppingOverviewScreen householdId={householdId} userId={userId} />;
 }

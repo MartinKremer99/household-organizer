@@ -23,9 +23,11 @@ export type {
   PendingOperationStatus,
   Product,
   PurchasedStock,
+  PutAwayPurchasedStockPayload,
   ShoppingItem,
   ShoppingItemStatus,
   SyncErrorKind,
   SyncLocalStatus,
   SyncMetadata,
 } from "./types";
+export { isInventoryCommandPayload } from "./types";

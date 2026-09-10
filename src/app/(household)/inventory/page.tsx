@@ -1,8 +1,7 @@
-export default function InventoryPage() {
-  return (
-    <div className="flex flex-col gap-3">
-      <h1 className="text-xl font-semibold tracking-tight">Inventory</h1>
-      <p className="text-sm text-foreground/80">No products yet.</p>
-    </div>
-  );
+import { InventoryOverviewScreen } from "@/features/inventory/ui/inventory-overview-screen";
+import { requireHouseholdId } from "../settings/load-household";
+
+export default async function InventoryPage() {
+  const householdId = await requireHouseholdId();
+  return <InventoryOverviewScreen householdId={householdId} />;
 }

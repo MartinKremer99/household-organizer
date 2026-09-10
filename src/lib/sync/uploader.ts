@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { InventoryAllocationPayload, OutboxPayload, PendingOperation } from "@/lib/db";
+import type {
+  InventoryAllocationPayload,
+  InventoryCommandPayload,
+  PendingOperation,
+  PutAwayPurchasedStockPayload,
+} from "@/lib/db";
 import { createClient } from "@/lib/supabase/client";
 import { complete, listPending, markAttempt, markFailed } from "./outbox";
 
@@ -73,7 +78,7 @@ function httpStatus(error: unknown): number | null {
 }
 
 function hasValidAllocations(
-  allocations: OutboxPayload["allocations"] | undefined,
+  allocations: InventoryAllocationPayload[] | undefined,
 ): allocations is InventoryAllocationPayload[] {
   if (!Array.isArray(allocations) || allocations.length === 0) {
     return false;
@@ -87,6 +92,27 @@ function hasValidAllocations(
       typeof allocation.delta === "number" &&
       Number.isInteger(allocation.delta) &&
       allocation.delta !== 0,
+  );
+}
+
+function isInventoryCommandPayload(
+  payload: PendingOperation["payload"],
+): payload is InventoryCommandPayload {
+  return "allocations" in payload && Array.isArray(payload.allocations);
+}
+
+function isValidPutAwayPayload(
+  payload: PendingOperation["payload"],
+): payload is PutAwayPurchasedStockPayload {
+  return (
+    "quantity" in payload &&
+    typeof payload.quantity === "number" &&
+    Number.isInteger(payload.quantity) &&
+    payload.quantity > 0 &&
+    typeof payload.product_id === "string" &&
+    payload.product_id.trim().length > 0 &&
+    typeof payload.location_id === "string" &&
+    payload.location_id.trim().length > 0
   );
 }
 
@@ -136,7 +162,19 @@ async function uploadOne(
       error: UploadPendingResult["error"];
     }
 > {
-  if (!hasValidAllocations(operation.payload.allocations)) {
+  if (operation.operation_type === "PUT_AWAY_PURCHASED_STOCK") {
+    if (!isValidPutAwayPayload(operation.payload)) {
+      await markFailed(householdId, operation.operation_id, "invalid_operation");
+      return {
+        kind: "stop",
+        stop_reason: "business_rejection",
+        error: { code: "invalid_operation", message: "put-away payload is invalid" },
+      };
+    }
+  } else if (
+    !isInventoryCommandPayload(operation.payload) ||
+    !hasValidAllocations(operation.payload.allocations)
+  ) {
     await markFailed(householdId, operation.operation_id, "invalid_operation");
     return {
       kind: "stop",
@@ -150,15 +188,31 @@ async function uploadOne(
   let data: unknown;
   let error: unknown;
   try {
-    const response = await supabase.rpc("apply_inventory_command", {
-      p_operation_id: operation.operation_id,
-      p_product_id: operation.payload.product_id,
-      p_location_id: operation.payload.location_id,
-      p_operation_type: operation.payload.operation_type,
-      p_allocations: operation.payload.allocations,
-      p_client_created_at:
-        operation.payload.client_created_at ?? operation.created_at,
-    });
+    const response =
+      operation.operation_type === "PUT_AWAY_PURCHASED_STOCK" &&
+      isValidPutAwayPayload(operation.payload)
+        ? await supabase.rpc("put_away_purchased_stock", {
+            p_operation_id: operation.operation_id,
+            p_product_id: operation.payload.product_id,
+            p_location_id: operation.payload.location_id,
+            p_quantity: operation.payload.quantity,
+            p_expiration_date: operation.payload.expiration_date ?? null,
+            p_client_created_at:
+              operation.payload.client_created_at ?? operation.created_at,
+          })
+        : await supabase.rpc("apply_inventory_command", {
+            p_operation_id: operation.operation_id,
+            p_product_id: operation.payload.product_id,
+            p_location_id: operation.payload.location_id,
+            p_operation_type: isInventoryCommandPayload(operation.payload)
+              ? operation.payload.operation_type
+              : "ADD",
+            p_allocations: isInventoryCommandPayload(operation.payload)
+              ? operation.payload.allocations
+              : [],
+            p_client_created_at:
+              operation.payload.client_created_at ?? operation.created_at,
+          });
     data = response.data;
     error = response.error;
   } catch (thrown) {

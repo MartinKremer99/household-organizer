@@ -4,7 +4,8 @@ import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetHouseholdDbForTests } from "@/lib/db";
-import type { OutboxPayload } from "@/lib/db";
+import type { InventoryAllocationPayload, InventoryCommandPayload } from "@/lib/db";
+import { isInventoryCommandPayload } from "@/lib/db";
 import {
   createPendingOperation,
   enqueue,
@@ -207,9 +208,9 @@ async function userClient(tokens: SessionTokens): Promise<SupabaseClient> {
 
 function commandPayload(
   ctx: HouseholdContext,
-  allocations: OutboxPayload["allocations"],
+  allocations: InventoryAllocationPayload[],
   operationType: "ADD" | "REMOVE" = "ADD",
-): OutboxPayload {
+): InventoryCommandPayload {
   return {
     product_id: ctx.productId,
     location_id: ctx.locationId,
@@ -329,7 +330,11 @@ describe.skipIf(!supabaseUp)("uploadPendingOperations integration", () => {
     expect(stored?.status).toBe("failed");
     expect(stored?.last_error).toBe("conflict");
     expect(stored?.operation_id).toBe(operationId);
-    expect(stored?.payload.allocations).toEqual([
+    expect(
+      stored && isInventoryCommandPayload(stored.payload)
+        ? stored.payload.allocations
+        : undefined,
+    ).toEqual([
       { inventory_lot_id: lot.id, delta: 4, expiration_date: null },
     ]);
     expect(await lotQuantity(user, lot.id)).toBe(3);

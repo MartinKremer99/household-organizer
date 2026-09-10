@@ -18,6 +18,7 @@ type Allocation = {
   inventory_lot_id: string;
   delta: number;
   expiration_date?: string | null;
+  location_id?: string;
 };
 
 function localSupabaseEnv(): { api: string; anon: string } | null {
@@ -177,13 +178,25 @@ async function addLot(
   ctx: HouseholdContext,
   quantity: number,
   expiration: string | null = null,
-): Promise<{ id: string; quantity: number }> {
+  locationId: string = ctx.locationId,
+): Promise<{ id: string; quantity: number; location_id: string }> {
   return restPost(ctx.token, "inventory_lots", {
     household_id: ctx.householdId,
     product_id: ctx.productId,
-    location_id: ctx.locationId,
+    location_id: locationId,
     quantity,
     expiration_date: expiration,
+  });
+}
+
+async function createLocation(
+  ctx: HouseholdContext,
+  name: string,
+): Promise<{ id: string }> {
+  return restPost(ctx.token, "locations", {
+    household_id: ctx.householdId,
+    name,
+    sort_order: 20,
   });
 }
 
@@ -679,5 +692,278 @@ describe.skipIf(!supabaseUp)("apply_inventory_command", () => {
     expect(
       sql(`select has_function_privilege('authenticated', '${COMMAND_SIG}', 'execute');`),
     ).toBe("t");
+  });
+
+  it("rejects ADD/REMOVE net-zero allocations and ADJUST", async () => {
+    const user = await bootstrapUser("cmd-netzero");
+    const lot = await addLot(user, 4);
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: crypto.randomUUID(),
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "ADD",
+          allocations: [
+            { inventory_lot_id: lot.id, delta: 2 },
+            { inventory_lot_id: crypto.randomUUID(), delta: -2, expiration_date: null },
+          ],
+        })
+      ).body,
+    ).toEqual({ ok: false, code: "invalid_operation" });
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: crypto.randomUUID(),
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "REMOVE",
+          allocations: [
+            { inventory_lot_id: lot.id, delta: -1 },
+            { inventory_lot_id: crypto.randomUUID(), delta: 1 },
+          ],
+        })
+      ).body,
+    ).toEqual({ ok: false, code: "invalid_operation" });
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: crypto.randomUUID(),
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "ADJUST",
+          allocations: [{ inventory_lot_id: lot.id, delta: 1 }],
+        })
+      ).body,
+    ).toEqual({ ok: false, code: "invalid_operation" });
+    expect(await lotQuantity(user, lot.id)).toBe(4);
+  });
+
+  it("moves stock atomically with one MOVE parent and matching lines", async () => {
+    const user = await bootstrapUser("cmd-move");
+    const dest = await createLocation(user, `Pantry ${Date.now()}`);
+    const source = await addLot(user, 5, "2027-01-10");
+    const destLotId = crypto.randomUUID();
+    const operationId = crypto.randomUUID();
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: operationId,
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "MOVE",
+          allocations: [
+            { inventory_lot_id: source.id, location_id: user.locationId, delta: -3 },
+            {
+              inventory_lot_id: destLotId,
+              location_id: dest.id,
+              delta: 3,
+              expiration_date: "2027-01-10",
+            },
+          ],
+        })
+      ).body,
+    ).toEqual({ ok: true, status: "applied", operation_id: operationId });
+
+    expect(await lotQuantity(user, source.id)).toBe(2);
+    const destLots = await restGet<
+      { id: string; quantity: number; location_id: string; expiration_date: string }[]
+    >(
+      user.token,
+      `inventory_lots?id=eq.${destLotId}&select=id,quantity,location_id,expiration_date`,
+    );
+    expect(destLots).toEqual([
+      {
+        id: destLotId,
+        quantity: 3,
+        location_id: dest.id,
+        expiration_date: "2027-01-10",
+      },
+    ]);
+
+    const parent = await restGet<
+      {
+        operation_type: string;
+        delta: number;
+        inventory_lot_id: string | null;
+        location_id: string;
+      }[]
+    >(
+      user.token,
+      `inventory_operations?operation_id=eq.${operationId}&select=operation_type,delta,inventory_lot_id,location_id`,
+    );
+    expect(parent).toEqual([
+      {
+        operation_type: "MOVE",
+        delta: 3,
+        inventory_lot_id: null,
+        location_id: user.locationId,
+      },
+    ]);
+    const lines = await restGet<{ inventory_lot_id: string; delta: number }[]>(
+      user.token,
+      `inventory_operation_lots?operation_id=eq.${operationId}&select=inventory_lot_id,delta`,
+    );
+    expect(lines).toHaveLength(2);
+    expect(lines.sort((a, b) => a.delta - b.delta)).toEqual([
+      { inventory_lot_id: source.id, delta: -3 },
+      { inventory_lot_id: destLotId, delta: 3 },
+    ]);
+  });
+
+  it("merges a destination lot or creates one at the destination location", async () => {
+    const user = await bootstrapUser("cmd-move-merge");
+    const dest = await createLocation(user, `Pantry ${Date.now()}`);
+    const sourceSoon = await addLot(user, 2, "2027-01-10");
+    const sourceLater = await addLot(user, 2, "2027-06-20");
+    const destSoon = await addLot(user, 1, "2027-01-10", dest.id);
+    const newLaterId = crypto.randomUUID();
+    const operationId = crypto.randomUUID();
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: operationId,
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "MOVE",
+          allocations: [
+            { inventory_lot_id: sourceSoon.id, location_id: user.locationId, delta: -2 },
+            { inventory_lot_id: sourceLater.id, location_id: user.locationId, delta: -1 },
+            { inventory_lot_id: destSoon.id, location_id: dest.id, delta: 2, expiration_date: "2027-01-10" },
+            {
+              inventory_lot_id: newLaterId,
+              location_id: dest.id,
+              delta: 1,
+              expiration_date: "2027-06-20",
+            },
+          ],
+        })
+      ).body,
+    ).toEqual({ ok: true, status: "applied", operation_id: operationId });
+
+    expect(await lotQuantity(user, sourceSoon.id)).toBe(0);
+    expect(await lotQuantity(user, sourceLater.id)).toBe(1);
+    expect(await lotQuantity(user, destSoon.id)).toBe(3);
+    const created = await restGet<{ location_id: string; quantity: number }[]>(
+      user.token,
+      `inventory_lots?id=eq.${newLaterId}&select=location_id,quantity`,
+    );
+    expect(created).toEqual([{ location_id: dest.id, quantity: 1 }]);
+  });
+
+  it("rejects insufficient MOVE stock without changing the destination", async () => {
+    const user = await bootstrapUser("cmd-move-short");
+    const dest = await createLocation(user, `Pantry ${Date.now()}`);
+    const source = await addLot(user, 1);
+    const destLot = await addLot(user, 5, null, dest.id);
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: crypto.randomUUID(),
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "MOVE",
+          allocations: [
+            { inventory_lot_id: source.id, location_id: user.locationId, delta: -2 },
+            { inventory_lot_id: destLot.id, location_id: dest.id, delta: 2 },
+          ],
+        })
+      ).body,
+    ).toEqual({ ok: false, code: "insufficient_stock" });
+    expect(await lotQuantity(user, source.id)).toBe(1);
+    expect(await lotQuantity(user, destLot.id)).toBe(5);
+    const history = await restGet<unknown[]>(user.token, "inventory_operations?select=id");
+    expect(history).toHaveLength(0);
+  });
+
+  it("rejects same-location, missing location_id, and unbalanced MOVE lines", async () => {
+    const user = await bootstrapUser("cmd-move-bad");
+    const dest = await createLocation(user, `Pantry ${Date.now()}`);
+    const source = await addLot(user, 4);
+    const destLot = await addLot(user, 1, null, dest.id);
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: crypto.randomUUID(),
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "MOVE",
+          allocations: [
+            { inventory_lot_id: source.id, location_id: user.locationId, delta: -1 },
+            { inventory_lot_id: destLot.id, location_id: user.locationId, delta: 1 },
+          ],
+        })
+      ).body,
+    ).toEqual({ ok: false, code: "invalid_move" });
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: crypto.randomUUID(),
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "MOVE",
+          allocations: [
+            { inventory_lot_id: source.id, delta: -1 },
+            { inventory_lot_id: destLot.id, delta: 1 },
+          ],
+        })
+      ).body,
+    ).toEqual({ ok: false, code: "invalid_operation" });
+
+    expect(
+      (
+        await applyCommand(user.token, {
+          operation_id: crypto.randomUUID(),
+          product_id: user.productId,
+          location_id: user.locationId,
+          operation_type: "MOVE",
+          allocations: [
+            { inventory_lot_id: source.id, location_id: user.locationId, delta: -2 },
+            { inventory_lot_id: destLot.id, location_id: dest.id, delta: 1 },
+          ],
+        })
+      ).body,
+    ).toEqual({ ok: false, code: "invalid_quantity" });
+    expect(await lotQuantity(user, source.id)).toBe(4);
+    expect(await lotQuantity(user, destLot.id)).toBe(1);
+  });
+
+  it("retries an identical MOVE without changing inventory", async () => {
+    const user = await bootstrapUser("cmd-move-idem");
+    const dest = await createLocation(user, `Pantry ${Date.now()}`);
+    const source = await addLot(user, 4);
+    const destLot = await addLot(user, 1, null, dest.id);
+    const operationId = crypto.randomUUID();
+    const args = {
+      operation_id: operationId,
+      product_id: user.productId,
+      location_id: user.locationId,
+      operation_type: "MOVE",
+      allocations: [
+        { inventory_lot_id: source.id, location_id: user.locationId, delta: -2 },
+        { inventory_lot_id: destLot.id, location_id: dest.id, delta: 2 },
+      ],
+    };
+
+    expect((await applyCommand(user.token, args)).body).toEqual({
+      ok: true,
+      status: "applied",
+      operation_id: operationId,
+    });
+    expect((await applyCommand(user.token, args)).body).toEqual({
+      ok: true,
+      status: "already_applied",
+      operation_id: operationId,
+    });
+    expect(await lotQuantity(user, source.id)).toBe(2);
+    expect(await lotQuantity(user, destLot.id)).toBe(3);
   });
 });

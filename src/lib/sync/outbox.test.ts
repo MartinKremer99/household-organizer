@@ -245,6 +245,26 @@ describe("outbox", () => {
     expect(await getByOperationId(HOUSEHOLD_A, operation.operation_id)).toBeNull();
   });
 
+  it("returns the existing put-away row when enqueue is repeated with the same command", async () => {
+    const putAway = {
+      household_id: HOUSEHOLD_A,
+      operation_id: "op-put",
+      operation_type: "PUT_AWAY_PURCHASED_STOCK" as const,
+      payload: {
+        product_id: "product-1",
+        location_id: "location-1",
+        quantity: 2,
+        expiration_date: "2027-01-10",
+        client_created_at: "2026-09-10T10:00:00.000Z",
+      },
+    };
+    const first = await enqueue(createPendingOperation(putAway));
+    const second = await enqueue(createPendingOperation(putAway));
+
+    expect(second).toEqual(first);
+    expect(await listPending(HOUSEHOLD_A)).toHaveLength(1);
+  });
+
   it("returns the existing row when enqueue is repeated with the same payload", async () => {
     const first = await enqueue(createPendingOperation(pendingInput()));
     const second = await enqueue(createPendingOperation(pendingInput()));
@@ -266,6 +286,29 @@ describe("outbox", () => {
     );
 
     await expect(enqueue(conflict)).rejects.toThrow("operation_id already exists");
+  });
+
+  it("treats allocation location_id as part of payload identity", async () => {
+    await enqueue(createPendingOperation(pendingInput()));
+
+    await expect(
+      enqueue(
+        createPendingOperation(
+          pendingInput({
+            payload: {
+              ...removePayload,
+              allocations: [
+                {
+                  inventory_lot_id: "lot-1",
+                  delta: -2,
+                  location_id: "location-2",
+                },
+              ],
+            },
+          }),
+        ),
+      ),
+    ).rejects.toThrow("operation_id already exists");
   });
 
   it("treats the same allocations in a different order as the same payload", async () => {

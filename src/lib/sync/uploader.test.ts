@@ -6,14 +6,14 @@ import { fileURLToPath } from "node:url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetHouseholdDbForTests } from "../db/database";
-import type { OutboxPayload } from "../db/types";
+import type { InventoryCommandPayload, OutboxPayload } from "../db/types";
 import { createPendingOperation, enqueue, getByOperationId, listPending } from "./outbox";
 import { uploadPendingOperations } from "./uploader";
 
 const HOUSEHOLD_A = "household-a";
 const HOUSEHOLD_B = "household-b";
 
-const addPayload: OutboxPayload = {
+const addPayload: InventoryCommandPayload = {
   product_id: "product-1",
   location_id: "location-1",
   operation_type: "ADD",
@@ -26,8 +26,8 @@ const addPayload: OutboxPayload = {
 type RpcCall = { fn: string; args: Record<string, unknown> };
 
 function payload(
-  overrides: Partial<OutboxPayload> = {},
-): OutboxPayload {
+  overrides: Partial<InventoryCommandPayload> = {},
+): InventoryCommandPayload {
   return {
     ...addPayload,
     allocations: overrides.allocations ?? addPayload.allocations,
@@ -315,6 +315,43 @@ describe("uploadPendingOperations", () => {
       last_error: "invalid_operation",
       retry_count: 0,
     });
+  });
+
+  it("uploads a put-away command through put_away_purchased_stock", async () => {
+    await enqueue(
+      createPendingOperation({
+        household_id: HOUSEHOLD_A,
+        operation_id: "op-put",
+        operation_type: "PUT_AWAY_PURCHASED_STOCK",
+        payload: {
+          product_id: "product-1",
+          location_id: "location-1",
+          quantity: 2,
+          expiration_date: null,
+          client_created_at: "2026-09-10T10:00:00.000Z",
+        },
+      }),
+    );
+    const { client, calls } = mockClient({});
+
+    const result = await uploadPendingOperations(HOUSEHOLD_A, { supabase: client });
+
+    expect(result.stop_reason).toBe("completed");
+    expect(result.uploaded_operation_ids).toEqual(["op-put"]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.fn).toBe("put_away_purchased_stock");
+    expect(calls[0]?.args).toEqual({
+      p_operation_id: "op-put",
+      p_product_id: "product-1",
+      p_location_id: "location-1",
+      p_quantity: 2,
+      p_expiration_date: null,
+      p_client_created_at: "2026-09-10T10:00:00.000Z",
+    });
+    expect(calls[0]?.args).not.toHaveProperty("p_user_id");
+    expect(calls[0]?.args).not.toHaveProperty("p_household_id");
+    expect(calls[0]?.args).not.toHaveProperty("p_allocations");
+    expect(await getByOperationId(HOUSEHOLD_A, "op-put")).toBeNull();
   });
 
   it("treats bodyless 401 as a transient error", async () => {

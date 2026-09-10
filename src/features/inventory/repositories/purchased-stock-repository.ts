@@ -24,4 +24,12 @@ export const purchasedStockRepository = {
   async put(record: PurchasedStock): Promise<void> {
     await getHouseholdDb().purchased_stock.put(record);
   },
+
+  async delete(householdId: string, id: string): Promise<void> {
+    const row = await getHouseholdDb().purchased_stock.get(id);
+    if (!row || row.household_id !== householdId) {
+      return;
+    }
+    await getHouseholdDb().purchased_stock.delete(id);
+  },
 };

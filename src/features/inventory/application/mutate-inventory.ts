@@ -72,23 +72,18 @@ export type MoveInventoryInput = {
   destination_location_id: string;
   quantity: number;
   operation_id?: string;
-  destination_operation_id?: string;
   client_created_at?: string;
 };
 
-export type MoveInventorySuccess = {
-  operation_id: string;
-  destination_operation_id: string;
-  lots: InventoryLot[];
-};
-
-type MutationPlan = {
+export type InventoryAddPlan = {
   lots: InventoryLot[];
   inventory_lot_id: string | null;
   delta: number;
   operation_type: InventoryOperationType;
   allocations: InventoryAllocationPayload[];
 };
+
+type MutationPlan = InventoryAddPlan;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -401,7 +396,7 @@ async function planRemove(
   };
 }
 
-async function persistPlan(
+async function persistLotsAndHistory(
   input: {
     household_id: string;
     user_id: string;
@@ -432,6 +427,21 @@ async function persistPlan(
   };
 
   await inventoryOperationRepository.add(history);
+}
+
+async function persistPlan(
+  input: {
+    household_id: string;
+    user_id: string;
+    product_id: string;
+    location_id: string;
+  },
+  operationId: string,
+  createdAt: string,
+  clientCreatedAt: string,
+  plan: MutationPlan,
+): Promise<void> {
+  await persistLotsAndHistory(input, operationId, createdAt, clientCreatedAt, plan);
   await enqueue(
     createPendingOperation({
       household_id: input.household_id,
@@ -472,6 +482,35 @@ async function runInTransaction<T>(
   }
 }
 
+export async function planInventoryAdd(
+  input: AddInventoryInput,
+  operationId: string,
+  candidateLotId: string,
+  now: string,
+): Promise<InventoryMutationResult<InventoryAddPlan>> {
+  return planAdd(input, operationId, candidateLotId, now);
+}
+
+export async function persistInventoryAddLocal(
+  input: AddInventoryInput,
+  operationId: string,
+  createdAt: string,
+  clientCreatedAt: string,
+  plan: InventoryAddPlan,
+): Promise<void> {
+  await persistLotsAndHistory(input, operationId, createdAt, clientCreatedAt, plan);
+}
+
+export async function persistInventoryAdd(
+  input: AddInventoryInput,
+  operationId: string,
+  createdAt: string,
+  clientCreatedAt: string,
+  plan: InventoryAddPlan,
+): Promise<void> {
+  await persistPlan(input, operationId, createdAt, clientCreatedAt, plan);
+}
+
 export async function addInventory(
   input: AddInventoryInput,
 ): Promise<InventoryMutationResult<InventoryMutationSuccess>> {
@@ -486,12 +525,23 @@ export async function addInventory(
   const clientCreatedAt = input.client_created_at ?? createdAt;
 
   return runInTransaction(async () => {
-    const planned = await planAdd(input, operationId, candidateLotId, createdAt);
+    const planned = await planInventoryAdd(
+      input,
+      operationId,
+      candidateLotId,
+      createdAt,
+    );
     if (!planned.ok) {
       return planned;
     }
 
-    await persistPlan(input, operationId, createdAt, clientCreatedAt, planned.value);
+    await persistInventoryAdd(
+      input,
+      operationId,
+      createdAt,
+      clientCreatedAt,
+      planned.value,
+    );
     return mutationOk({ operation_id: operationId, lots: planned.value.lots });
   });
 }
@@ -557,7 +607,6 @@ async function loadMoveContext(
 async function planMoveDestination(
   input: MoveInventoryInput,
   sourcePlan: MutationPlan,
-  destinationOperationId: string,
   now: string,
 ): Promise<InventoryMutationResult<MutationPlan>> {
   const sourceLotsById = new Map(sourcePlan.lots.map((lot) => [lot.id, lot]));
@@ -608,30 +657,19 @@ async function planMoveDestination(
     });
     plannedAllocations.push({
       inventory_lot_id: lotResult.value.id,
+      location_id: input.destination_location_id,
       delta: quantity,
       expiration_date: lotResult.value.expiration_date,
     });
-  }
-
-  const operation = validateInventoryOperation({
-    operation_id: destinationOperationId,
-    household_id: input.household_id,
-    product_id: input.product_id,
-    location_id: input.destination_location_id,
-    delta: input.quantity,
-    operation_type: "ADD",
-  });
-  if (!operation.ok) {
-    return mutationErr(mapDomainCode(operation.code));
   }
 
   return {
     ok: true,
     value: {
       lots: written,
-      inventory_lot_id: written.length === 1 ? written[0].id : null,
+      inventory_lot_id: null,
       delta: input.quantity,
-      operation_type: "ADD",
+      operation_type: "MOVE",
       allocations: plannedAllocations,
     },
   };
@@ -639,15 +677,13 @@ async function planMoveDestination(
 
 export async function moveInventory(
   input: MoveInventoryInput,
-): Promise<InventoryMutationResult<MoveInventorySuccess>> {
+): Promise<InventoryMutationResult<InventoryMutationSuccess>> {
   const common = validateCommon(input);
   if (common) {
     return mutationErr(common);
   }
 
   const operationId = input.operation_id ?? createOperationId();
-  const destinationOperationId =
-    input.destination_operation_id ?? createOperationId();
   const createdAt = new Date().toISOString();
   const clientCreatedAt = input.client_created_at ?? createdAt;
 
@@ -672,6 +708,18 @@ export async function moveInventory(
       return mutationErr(mapDomainCode(move.code));
     }
 
+    const operation = validateInventoryOperation({
+      operation_id: operationId,
+      household_id: input.household_id,
+      product_id: input.product_id,
+      location_id: input.source_location_id,
+      delta: input.quantity,
+      operation_type: "MOVE",
+    });
+    if (!operation.ok) {
+      return mutationErr(mapDomainCode(operation.code));
+    }
+
     const sourcePlan = await planRemove(
       {
         household_id: input.household_id,
@@ -687,15 +735,25 @@ export async function moveInventory(
       return sourcePlan;
     }
 
-    const destPlan = await planMoveDestination(
-      input,
-      sourcePlan.value,
-      destinationOperationId,
-      createdAt,
-    );
+    const destPlan = await planMoveDestination(input, sourcePlan.value, createdAt);
     if (!destPlan.ok) {
       return destPlan;
     }
+
+    const combined: MutationPlan = {
+      lots: [...sourcePlan.value.lots, ...destPlan.value.lots],
+      inventory_lot_id: null,
+      delta: input.quantity,
+      operation_type: "MOVE",
+      allocations: [
+        ...sourcePlan.value.allocations.map((allocation) => ({
+          inventory_lot_id: allocation.inventory_lot_id,
+          location_id: input.source_location_id,
+          delta: allocation.delta,
+        })),
+        ...destPlan.value.allocations,
+      ],
+    };
 
     await persistPlan(
       {
@@ -707,28 +765,9 @@ export async function moveInventory(
       operationId,
       createdAt,
       clientCreatedAt,
-      sourcePlan.value,
-    );
-    await persistPlan(
-      {
-        household_id: input.household_id,
-        user_id: input.user_id,
-        product_id: input.product_id,
-        location_id: input.destination_location_id,
-      },
-      destinationOperationId,
-      createdAt,
-      clientCreatedAt,
-      destPlan.value,
+      combined,
     );
 
-    return {
-      ok: true,
-      value: {
-        operation_id: operationId,
-        destination_operation_id: destinationOperationId,
-        lots: [...sourcePlan.value.lots, ...destPlan.value.lots],
-      },
-    };
+    return mutationOk({ operation_id: operationId, lots: combined.lots });
   });
 }

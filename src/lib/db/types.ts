@@ -1,6 +1,7 @@
 export type InventoryOperationType =
   | "ADD"
   | "REMOVE"
+  | "MOVE"
   | "MOVE_IN"
   | "MOVE_OUT"
   | "ADJUST"
@@ -107,6 +108,7 @@ export type InventoryAllocationPayload = {
   inventory_lot_id: string;
   delta: number;
   expiration_date?: string | null;
+  location_id?: string;
 };
 
 export type InventoryCommandPayload = {
@@ -117,9 +119,23 @@ export type InventoryCommandPayload = {
   client_created_at?: string;
 };
 
-export type OutboxPayload = InventoryCommandPayload;
+export type PutAwayPurchasedStockPayload = {
+  product_id: string;
+  location_id: string;
+  quantity: number;
+  expiration_date?: string | null;
+  client_created_at?: string;
+};
 
-export type OutboxOperationType = "INVENTORY_DELTA";
+export type OutboxPayload = InventoryCommandPayload | PutAwayPurchasedStockPayload;
+
+export function isInventoryCommandPayload(
+  payload: OutboxPayload,
+): payload is InventoryCommandPayload {
+  return "allocations" in payload && Array.isArray(payload.allocations);
+}
+
+export type OutboxOperationType = "INVENTORY_DELTA" | "PUT_AWAY_PURCHASED_STOCK";
 
 export type PendingOperation = {
   id: string;
