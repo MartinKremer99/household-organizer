@@ -3,6 +3,7 @@ export {
   HOUSEHOLD_DB_TABLES,
   HOUSEHOLD_DB_VERSION,
   HouseholdDatabase,
+  closeHouseholdDbForTests,
   getHouseholdDb,
   resetHouseholdDbForTests,
 } from "./database";
@@ -24,5 +25,7 @@ export type {
   PurchasedStock,
   ShoppingItem,
   ShoppingItemStatus,
+  SyncErrorKind,
+  SyncLocalStatus,
   SyncMetadata,
 } from "./types";

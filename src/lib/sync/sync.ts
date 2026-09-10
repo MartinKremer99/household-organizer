@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { householdRepository } from "@/features/household/repositories/household-repository";
 import { createClient } from "@/lib/supabase/client";
+import { listPending } from "./outbox";
+import { syncMetadataRepository } from "./sync-metadata-repository";
 import {
   uploadPendingOperations,
   type UploadPendingResult,
@@ -118,11 +120,47 @@ export async function syncHousehold(
   return promise;
 }
 
+async function persistSyncResult(
+  householdId: string,
+  result: SyncHouseholdResult,
+): Promise<void> {
+  if (result.status === "completed") {
+    const pending = await listPending(householdId);
+    await syncMetadataRepository.recordSuccess(householdId, {
+      hasPending: pending.length > 0,
+      stopReason: result.stop_reason ?? "completed",
+    });
+    return;
+  }
+
+  if (result.status === "stopped" || result.status === "no_household") {
+    await syncMetadataRepository.recordFailure(householdId, {
+      kind: "business",
+      code: result.error?.code ?? result.stop_reason,
+      message: result.error?.message ?? result.stop_reason,
+      stopReason: result.stop_reason ?? "business_rejection",
+    });
+    return;
+  }
+
+  if (result.status === "transient_error" || result.status === "unauthenticated") {
+    await syncMetadataRepository.recordFailure(householdId, {
+      kind: "transient",
+      code: result.error?.code ?? result.stop_reason,
+      message: result.error?.message ?? result.stop_reason,
+      stopReason: result.stop_reason ?? "transient_error",
+    });
+  }
+}
+
 async function uploadPendingOperationsForHousehold(
   householdId: string,
   supabase: SupabaseClient,
   upload: typeof uploadPendingOperations,
 ): Promise<SyncHouseholdResult> {
+  await syncMetadataRepository.markAttemptStarted(householdId);
   const uploaded = await upload(householdId, { supabase });
-  return mapUpload(householdId, uploaded);
+  const result = mapUpload(householdId, uploaded);
+  await persistSyncResult(householdId, result);
+  return result;
 }

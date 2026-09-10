@@ -79,11 +79,14 @@ export function getHouseholdDb(): HouseholdDatabase {
   return householdDb;
 }
 
-export async function resetHouseholdDbForTests(): Promise<void> {
+export function closeHouseholdDbForTests(): void {
   if (householdDb) {
     householdDb.close();
     householdDb = undefined;
   }
+}
 
+export async function resetHouseholdDbForTests(): Promise<void> {
+  closeHouseholdDbForTests();
   await Dexie.delete(HOUSEHOLD_DB_NAME);
 }

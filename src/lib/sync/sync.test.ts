@@ -9,7 +9,9 @@ import { householdRepository } from "@/features/household/repositories/household
 import { inventoryRepository } from "@/features/inventory/repositories/inventory-repository";
 import { createClient } from "@/lib/supabase/client";
 import { resetHouseholdDbForTests } from "../db/database";
+import { createPendingOperation, enqueue } from "./outbox";
 import { resetSyncHouseholdForTests, syncHousehold } from "./sync";
+import { syncMetadataRepository } from "./sync-metadata-repository";
 import type { UploadPendingResult } from "./uploader";
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -58,6 +60,22 @@ async function putMembership(householdId: string, userId: string): Promise<void>
   });
 }
 
+async function enqueuePending(householdId: string, operationId: string): Promise<void> {
+  await enqueue(
+    createPendingOperation({
+      household_id: householdId,
+      operation_id: operationId,
+      operation_type: "INVENTORY_DELTA",
+      payload: {
+        product_id: "product-1",
+        location_id: "location-1",
+        operation_type: "REMOVE",
+        allocations: [{ inventory_lot_id: "lot-1", delta: -1 }],
+      },
+    }),
+  );
+}
+
 beforeEach(async () => {
   await resetHouseholdDbForTests();
   resetSyncHouseholdForTests();
@@ -83,6 +101,7 @@ describe("syncHousehold", () => {
     });
     expect(upload).not.toHaveBeenCalled();
     expect(createClient).not.toHaveBeenCalled();
+    expect(await syncMetadataRepository.get(HOUSEHOLD_A)).toBeNull();
   });
 
   it("returns no_household when the user has no membership", async () => {
@@ -96,6 +115,7 @@ describe("syncHousehold", () => {
     expect(result.status).toBe("no_household");
     expect(result.household_id).toBeNull();
     expect(upload).not.toHaveBeenCalled();
+    expect(await syncMetadataRepository.get(HOUSEHOLD_A)).toBeNull();
   });
 
   it("returns no_household when the user has more than one membership", async () => {
@@ -110,6 +130,8 @@ describe("syncHousehold", () => {
 
     expect(result.status).toBe("no_household");
     expect(upload).not.toHaveBeenCalled();
+    expect(await syncMetadataRepository.get(HOUSEHOLD_A)).toBeNull();
+    expect(await syncMetadataRepository.get(HOUSEHOLD_B)).toBeNull();
   });
 
   it("invokes the uploader for the membership household with the injected client", async () => {
@@ -213,6 +235,12 @@ describe("syncHousehold", () => {
     expect(left).toEqual(right);
     expect(left.uploaded_operation_ids).toEqual(["shared"]);
     expect(upload).toHaveBeenCalledTimes(1);
+
+    const metadata = await syncMetadataRepository.get(HOUSEHOLD_A);
+    expect(metadata?.last_attempt_at).toEqual(expect.any(String));
+    expect(metadata?.last_status).toBe("synced");
+    expect(metadata?.last_sync_at).toEqual(expect.any(String));
+    expect(metadata?.last_stop_reason).toBe("completed");
   });
 
   it("does not block a different household", async () => {
@@ -239,6 +267,85 @@ describe("syncHousehold", () => {
     expect(seen.sort()).toEqual([HOUSEHOLD_A, HOUSEHOLD_B]);
     expect(left.household_id).toBe(HOUSEHOLD_A);
     expect(right.household_id).toBe(HOUSEHOLD_B);
+  });
+
+  it("records synced metadata when the uploader reports an empty queue", async () => {
+    await putMembership(HOUSEHOLD_A, USER_A);
+
+    const result = await syncHousehold({
+      supabase: sessionClient(USER_A),
+      uploadPendingOperations: vi.fn().mockResolvedValue(
+        uploadResult({
+          stop_reason: "empty",
+          uploaded_operation_ids: [],
+        }),
+      ),
+    });
+
+    expect(result.status).toBe("completed");
+    const metadata = await syncMetadataRepository.get(HOUSEHOLD_A);
+    expect(metadata?.last_status).toBe("synced");
+    expect(metadata?.last_sync_at).toEqual(expect.any(String));
+    expect(metadata?.last_stop_reason).toBe("empty");
+    expect(metadata?.last_error_kind).toBeNull();
+  });
+
+  it("records pending metadata when a pending outbox row remains after completed", async () => {
+    await putMembership(HOUSEHOLD_A, USER_A);
+    await enqueuePending(HOUSEHOLD_A, "op-leftover");
+
+    const result = await syncHousehold({
+      supabase: sessionClient(USER_A),
+      uploadPendingOperations: vi.fn().mockResolvedValue(uploadResult()),
+    });
+
+    expect(result.status).toBe("completed");
+    const metadata = await syncMetadataRepository.get(HOUSEHOLD_A);
+    expect(metadata?.last_status).toBe("pending");
+    expect(metadata?.last_sync_at).toEqual(expect.any(String));
+    expect(metadata?.last_stop_reason).toBe("completed");
+  });
+
+  it("records failed metadata for transient and business uploader outcomes", async () => {
+    await putMembership(HOUSEHOLD_A, USER_A);
+    const supabase = sessionClient(USER_A);
+
+    await syncHousehold({
+      supabase,
+      uploadPendingOperations: vi.fn().mockResolvedValue(
+        uploadResult({
+          stop_reason: "transient_error",
+          uploaded_operation_ids: [],
+          error: { code: "transient_error", message: "Failed to fetch" },
+        }),
+      ),
+    });
+
+    expect(await syncMetadataRepository.get(HOUSEHOLD_A)).toMatchObject({
+      last_status: "failed",
+      last_error_kind: "transient",
+      last_error_code: "transient_error",
+      last_stop_reason: "transient_error",
+    });
+
+    resetSyncHouseholdForTests();
+    await syncHousehold({
+      supabase,
+      uploadPendingOperations: vi.fn().mockResolvedValue(
+        uploadResult({
+          stop_reason: "conflict",
+          stopped_operation_id: "op-1",
+          error: { code: "conflict", message: "conflict" },
+        }),
+      ),
+    });
+
+    expect(await syncMetadataRepository.get(HOUSEHOLD_A)).toMatchObject({
+      last_status: "failed",
+      last_error_kind: "business",
+      last_error_code: "conflict",
+      last_stop_reason: "conflict",
+    });
   });
 
   it("does not modify local inventory", async () => {

@@ -134,9 +134,19 @@ export type PendingOperation = {
   status: PendingOperationStatus;
 };
 
+export type SyncLocalStatus = "never_synced" | "synced" | "pending" | "failed";
+
+export type SyncErrorKind = "transient" | "business";
+
 export type SyncMetadata = {
   household_id: string;
   last_sync_at: string | null;
+  last_attempt_at: string | null;
+  last_status: SyncLocalStatus;
+  last_error_kind: SyncErrorKind | null;
+  last_error_code: string | null;
+  last_error_message: string | null;
+  last_stop_reason: string | null;
   last_server_cursor: string | null;
   schema_version: number;
 };
