@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InventoryOverviewItem } from "@/features/inventory/application/read-inventory";
 import {
@@ -51,11 +51,24 @@ const location = {
   updated_at: "2026-09-09T10:00:00.000Z",
 };
 
+const oats = {
+  id: "prod-oats",
+  household_id: HOUSEHOLD,
+  name: "Oats",
+  category_id: "cat-1",
+  minimum_stock: 0,
+  barcode: null,
+  is_active: true,
+  created_at: "2026-09-09T10:00:00.000Z",
+  updated_at: "2026-09-09T10:00:00.000Z",
+};
+
 function api(overrides: Partial<InventoryOverviewScreenApi> = {}): InventoryOverviewScreenApi {
   return {
     listInventoryOverview: vi.fn().mockResolvedValue([milk, water]),
     listActiveCategories: vi.fn().mockResolvedValue([category]),
     listActiveLocations: vi.fn().mockResolvedValue([location]),
+    createProduct: vi.fn().mockResolvedValue({ ok: true, value: oats }),
     ...overrides,
   };
 }
@@ -193,6 +206,7 @@ describe("InventoryOverviewScreen", () => {
     });
 
     expect(await screen.findByText("No products match these filters.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add product" })).toBeNull();
   });
 
   it("seeds the location filter from initialLocationId", async () => {
@@ -220,5 +234,112 @@ describe("InventoryOverviewScreen", () => {
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
 
     expect(await screen.findByText("No products yet.")).toBeTruthy();
+  });
+
+  it("opens the add product dialog from the empty catalog", async () => {
+    const inventory = api({
+      listInventoryOverview: vi.fn().mockResolvedValue([]),
+    });
+    render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
+    await screen.findByText("No products yet.");
+
+    expect(screen.getAllByRole("button", { name: "Add product" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    expect(screen.getByRole("dialog", { name: "Add product" })).toBeTruthy();
+  });
+
+  it("opens the add product dialog from the header when products exist", async () => {
+    render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={api()} />);
+    await screen.findByRole("heading", { name: "Milk" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    expect(screen.getByRole("dialog", { name: "Add product" })).toBeTruthy();
+  });
+
+  it("requires name and category and defaults minimum stock to zero", async () => {
+    render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={api()} />);
+    await screen.findByRole("heading", { name: "Milk" });
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByLabelText("Name")).toHaveProperty("required", true);
+    expect(dialog.getByLabelText("Category")).toHaveProperty("required", true);
+    expect(dialog.getByLabelText("Minimum stock")).toHaveProperty("value", "0");
+    expect(dialog.getByRole("option", { name: "Food" })).toBeTruthy();
+  });
+
+  it("disables create and links to settings when there are no categories", async () => {
+    const inventory = api({
+      listActiveCategories: vi.fn().mockResolvedValue([]),
+    });
+    render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
+    await screen.findByRole("heading", { name: "Milk" });
+
+    expect(screen.getByRole("link", { name: /Settings.*Categories/ }).getAttribute("href")).toBe(
+      "/settings/categories",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByRole("button", { name: "Save" })).toHaveProperty("disabled", true);
+    expect(dialog.getByRole("link", { name: /Settings.*Categories/ }).getAttribute("href")).toBe(
+      "/settings/categories",
+    );
+  });
+
+  it("creates a product through createProduct and opens the new product", async () => {
+    const onProductCreated = vi.fn();
+    const inventory = api();
+    render(
+      <InventoryOverviewScreen
+        householdId={HOUSEHOLD}
+        onProductCreated={onProductCreated}
+        api={inventory}
+      />,
+    );
+    await screen.findByRole("heading", { name: "Milk" });
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByLabelText("Name"), { target: { value: "Oats" } });
+    fireEvent.submit(dialog.getByRole("button", { name: "Save" }).closest("form")!);
+
+    await waitFor(() => {
+      expect(inventory.createProduct).toHaveBeenCalledWith({
+        household_id: HOUSEHOLD,
+        name: "Oats",
+        category_id: "cat-1",
+        minimum_stock: 0,
+      });
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(vi.mocked(inventory.listInventoryOverview).mock.calls.length).toBeGreaterThan(1);
+    expect(onProductCreated).toHaveBeenCalledWith("prod-oats");
+  });
+
+  it("keeps the dialog open when createProduct fails", async () => {
+    const onProductCreated = vi.fn();
+    const inventory = api({
+      createProduct: vi.fn().mockResolvedValue({ ok: false, code: "duplicate_name" }),
+    });
+    render(
+      <InventoryOverviewScreen
+        householdId={HOUSEHOLD}
+        onProductCreated={onProductCreated}
+        api={inventory}
+      />,
+    );
+    await screen.findByRole("heading", { name: "Milk" });
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByLabelText("Name"), { target: { value: "Milk" } });
+    fireEvent.submit(dialog.getByRole("button", { name: "Save" }).closest("form")!);
+
+    expect((await screen.findByRole("alert")).textContent).toBe("That name is already used.");
+    expect(screen.getByRole("dialog", { name: "Add product" })).toBeTruthy();
+    expect(onProductCreated).not.toHaveBeenCalled();
   });
 });

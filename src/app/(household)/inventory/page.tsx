@@ -1,4 +1,4 @@
-import { InventoryOverviewScreen } from "@/features/inventory/ui/inventory-overview-screen";
+import { InventoryOverviewRoute } from "@/features/inventory/ui/inventory-overview-screen";
 import { requireHouseholdId } from "../settings/load-household";
 
 export default async function InventoryPage({
@@ -10,7 +10,7 @@ export default async function InventoryPage({
   const raw = (await searchParams).location;
   const location = Array.isArray(raw) ? raw[0] : raw;
   return (
-    <InventoryOverviewScreen
+    <InventoryOverviewRoute
       key={location ?? ""}
       householdId={householdId}
       initialLocationId={typeof location === "string" && location !== "" ? location : undefined}

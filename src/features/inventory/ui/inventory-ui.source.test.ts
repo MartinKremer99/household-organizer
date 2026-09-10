@@ -25,5 +25,15 @@ describe("inventory UI source", () => {
     expect(sources).not.toMatch(/selectLotsForConsumption/);
     expect(sources).not.toMatch(/isExpired/);
     expect(sources).not.toMatch(/isExpiringWithin/);
+    expect(sources).not.toMatch(/validateCatalogName/);
+    expect(sources).not.toMatch(/validateMinimumStock/);
+  });
+
+  it("does not call addInventory from the inventory overview", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const overview = readFileSync(join(dir, "inventory-overview-screen.tsx"), "utf8");
+
+    expect(overview).not.toMatch(/addInventory/);
+    expect(overview).not.toMatch(/mutate-inventory/);
   });
 });
