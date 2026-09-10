@@ -22,5 +22,8 @@ describe("inventory UI source", () => {
     expect(sources).not.toMatch(/outbox/);
     expect(sources).not.toMatch(/uploader/);
     expect(sources).not.toMatch(/syncHousehold/);
+    expect(sources).not.toMatch(/selectLotsForConsumption/);
+    expect(sources).not.toMatch(/isExpired/);
+    expect(sources).not.toMatch(/isExpiringWithin/);
   });
 });

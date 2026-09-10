@@ -105,10 +105,10 @@ describe("InventoryProductScreen", () => {
 
     expect(await screen.findByRole("heading", { name: "Milk" })).toBeTruthy();
     expect(screen.getByText("Food")).toBeTruthy();
-    expect(screen.getByText("5 in stock")).toBeTruthy();
+    expect(screen.getByText("Total: 5")).toBeTruthy();
     expect(screen.getByText("Min 4")).toBeTruthy();
-    expect(screen.getByText("Kitchen 3")).toBeTruthy();
-    expect(screen.getByText("Cellar 2")).toBeTruthy();
+    expect(screen.getByText("Kitchen: 3")).toBeTruthy();
+    expect(screen.getByText("Cellar: 2")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Back to inventory" }).getAttribute("href")).toBe(
       "/inventory",
     );
@@ -123,8 +123,8 @@ describe("InventoryProductScreen", () => {
     expect(screen.getByText("No expiration")).toBeTruthy();
     expect(screen.getByText("Expired")).toBeTruthy();
     expect(screen.getByText("2020-01-01")).toBeTruthy();
-    expect(screen.getByText("2 at Kitchen")).toBeTruthy();
-    expect(screen.getByText("2 at Cellar")).toBeTruthy();
+    expect(screen.getByText(/2 at Kitchen/)).toBeTruthy();
+    expect(screen.getByText(/2 at Cellar/)).toBeTruthy();
     expect(inventory.getProductInventory).toHaveBeenCalledWith(HOUSEHOLD, "prod-1", {
       today: "2026-09-10",
     });
@@ -186,6 +186,8 @@ describe("InventoryProductScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Add stock" }));
     const addDialog = screen.getByRole("dialog", { name: "Add stock" });
+    expect(within(addDialog).getByLabelText("Quantity")).toHaveProperty("inputMode", "numeric");
+    expect(within(addDialog).getByLabelText("Location")).toHaveProperty("value", "loc-1");
     fireEvent.change(within(addDialog).getByLabelText("Quantity"), {
       target: { value: "2" },
     });
@@ -303,7 +305,7 @@ describe("InventoryProductScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     const removeDialog = screen.getByRole("dialog", { name: "Remove" });
     fireEvent.change(within(removeDialog).getByLabelText("Quantity"), {
-      target: { value: "3" },
+      target: { value: "1" },
     });
     fireEvent.change(within(removeDialog).getByLabelText("Lot"), {
       target: { value: "lot-dated" },
@@ -316,7 +318,7 @@ describe("InventoryProductScreen", () => {
         user_id: USER,
         product_id: "prod-1",
         location_id: "loc-1",
-        quantity: 3,
+        quantity: 1,
         inventory_lot_id: "lot-dated",
       });
     });
@@ -393,5 +395,83 @@ describe("InventoryProductScreen", () => {
     expect(await screen.findByText("Choose two different locations.")).toBeTruthy();
     expect(screen.getByRole("dialog", { name: "Move" })).toBeTruthy();
     expect(screen.queryByText("invalid_move")).toBeNull();
+  });
+
+  it("shows remove location quantity and blocks excess", async () => {
+    const inventory = api();
+    renderScreen(inventory);
+    await screen.findByRole("heading", { name: "Milk" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    const removeDialog = screen.getByRole("dialog", { name: "Remove" });
+    expect(within(removeDialog).getByText("3 available at Kitchen")).toBeTruthy();
+    expect(within(removeDialog).getByLabelText("Quantity")).toHaveProperty("max", "3");
+
+    fireEvent.change(within(removeDialog).getByLabelText("Quantity"), {
+      target: { value: "4" },
+    });
+    expect(within(removeDialog).getByRole("button", { name: "Remove" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    fireEvent.submit(within(removeDialog).getByRole("button", { name: "Remove" }).closest("form")!);
+    expect(inventory.removeInventory).not.toHaveBeenCalled();
+  });
+
+  it("shows selected remove lot quantity and expiration", async () => {
+    renderScreen();
+    await screen.findByRole("heading", { name: "Milk" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    const removeDialog = screen.getByRole("dialog", { name: "Remove" });
+    fireEvent.change(within(removeDialog).getByLabelText("Lot"), {
+      target: { value: "lot-dated" },
+    });
+    expect(within(removeDialog).getByText("2 available")).toBeTruthy();
+    expect(within(removeDialog).getByText("2026-09-12")).toBeTruthy();
+    expect(within(removeDialog).getByLabelText("Quantity")).toHaveProperty("max", "2");
+  });
+
+  it("resets an incompatible lot when the remove location changes", async () => {
+    renderScreen();
+    await screen.findByRole("heading", { name: "Milk" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    const removeDialog = screen.getByRole("dialog", { name: "Remove" });
+    fireEvent.change(within(removeDialog).getByLabelText("Lot"), {
+      target: { value: "lot-dated" },
+    });
+    fireEvent.change(within(removeDialog).getByLabelText("Location"), {
+      target: { value: "loc-2" },
+    });
+
+    expect(within(removeDialog).getByLabelText("Lot")).toHaveProperty("value", "");
+    expect(within(removeDialog).queryByRole("option", { name: /Kitchen ·/ })).toBeNull();
+    expect(within(removeDialog).getByText("2 available at Cellar")).toBeTruthy();
+  });
+
+  it("shows move source quantity and lots without a lot picker", async () => {
+    const inventory = api();
+    renderScreen(inventory);
+    await screen.findByRole("heading", { name: "Milk" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Move" }));
+    const moveDialog = screen.getByRole("dialog", { name: "Move" });
+    expect(within(moveDialog).getByText("3 available at Kitchen")).toBeTruthy();
+    expect(within(moveDialog).getByText("Oldest lots are used first.")).toBeTruthy();
+    expect(within(moveDialog).getByText("2026-09-12")).toBeTruthy();
+    expect(within(moveDialog).getByText("2")).toBeTruthy();
+    expect(within(moveDialog).queryByLabelText("Lot")).toBeNull();
+    expect(within(moveDialog).getByLabelText("Quantity")).toHaveProperty("max", "3");
+
+    fireEvent.change(within(moveDialog).getByLabelText("Quantity"), {
+      target: { value: "4" },
+    });
+    expect(within(moveDialog).getByRole("button", { name: "Move" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    fireEvent.submit(within(moveDialog).getByRole("button", { name: "Move" }).closest("form")!);
+    expect(inventory.moveInventory).not.toHaveBeenCalled();
   });
 });

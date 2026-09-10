@@ -62,6 +62,13 @@ function firstOtherLocation(locations: Location[], sourceId: string): string {
   return locations.find((row) => row.id !== sourceId)?.id ?? "";
 }
 
+function locationQuantity(
+  locations: ProductInventory["locations"],
+  locationId: string,
+): number {
+  return locations.find((row) => row.location_id === locationId)?.quantity ?? 0;
+}
+
 export function InventoryProductScreen({
   householdId,
   userId,
@@ -145,7 +152,33 @@ export function InventoryProductScreen({
   const lotsAtRemoveLocation = (product?.lots ?? []).filter(
     (lot) => lot.location_id === removeLocationId,
   );
+  const selectedRemoveLot =
+    lotsAtRemoveLocation.find((lot) => lot.lot_id === removeLotId) ?? null;
+  const removeLocationName =
+    stockedLocations.find((row) => row.location_id === removeLocationId)?.location_name ??
+    "Unknown location";
+  const removeMax = selectedRemoveLot
+    ? selectedRemoveLot.quantity
+    : locationQuantity(stockedLocations, removeLocationId);
+  const removeQuantityValue = parsePositiveInteger(removeQuantity);
+  const removeBlocked =
+    removeMax === 0 ||
+    removeQuantityValue === null ||
+    removeQuantityValue > removeMax;
+  const lotsAtMoveSource = (product?.lots ?? []).filter(
+    (lot) => lot.location_id === moveSourceId,
+  );
+  const moveSourceName =
+    stockedLocations.find((row) => row.location_id === moveSourceId)?.location_name ??
+    "Unknown location";
+  const moveMax = locationQuantity(stockedLocations, moveSourceId);
+  const moveQuantityValue = parsePositiveInteger(moveQuantity);
   const sameMoveLocation = Boolean(moveSourceId) && moveSourceId === moveDestId;
+  const moveBlocked =
+    sameMoveLocation ||
+    moveMax === 0 ||
+    moveQuantityValue === null ||
+    moveQuantityValue > moveMax;
 
   function closeDialog() {
     if (pending) {
@@ -192,6 +225,9 @@ export function InventoryProductScreen({
   }
 
   async function submitAdd() {
+    if (pending) {
+      return;
+    }
     const quantity = parsePositiveInteger(addQuantity);
     if (quantity === null) {
       setFormError(inventoryErrorMessage("invalid_quantity"));
@@ -218,9 +254,11 @@ export function InventoryProductScreen({
   }
 
   async function submitRemove() {
+    if (pending) {
+      return;
+    }
     const quantity = parsePositiveInteger(removeQuantity);
-    if (quantity === null) {
-      setFormError(inventoryErrorMessage("invalid_quantity"));
+    if (quantity === null || quantity > removeMax || removeMax === 0) {
       return;
     }
     setPending(true);
@@ -244,13 +282,15 @@ export function InventoryProductScreen({
   }
 
   async function submitMove() {
+    if (pending) {
+      return;
+    }
     if (sameMoveLocation) {
       setFormError(inventoryErrorMessage("invalid_move"));
       return;
     }
     const quantity = parsePositiveInteger(moveQuantity);
-    if (quantity === null) {
-      setFormError(inventoryErrorMessage("invalid_quantity"));
+    if (quantity === null || quantity > moveMax || moveMax === 0) {
       return;
     }
     setPending(true);
@@ -318,7 +358,7 @@ export function InventoryProductScreen({
           <p className="text-sm">
             {product.total_quantity === 0
               ? "Out of stock"
-              : `${product.total_quantity} in stock`}
+              : `Total: ${product.total_quantity}`}
           </p>
           {product.minimum_stock > 0 ? (
             <p className="text-sm">Min {product.minimum_stock}</p>
@@ -344,7 +384,7 @@ export function InventoryProductScreen({
               <ul className="flex flex-col gap-1">
                 {product.locations.map((row) => (
                   <li key={row.location_id}>
-                    {row.location_name ?? "Unknown location"} {row.quantity}
+                    {row.location_name ?? "Unknown location"}: {row.quantity}
                   </li>
                 ))}
               </ul>
@@ -364,7 +404,7 @@ export function InventoryProductScreen({
                   return (
                     <li key={lot.lot_id}>
                       <p>
-                        {lot.quantity} at {lot.location_name ?? "Unknown location"}
+                        Qty {lot.quantity} at {lot.location_name ?? "Unknown location"}
                       </p>
                       <p>
                         {lot.expiration_date === null
@@ -459,9 +499,20 @@ export function InventoryProductScreen({
             id="remove-quantity"
             label="Quantity"
             inputMode="numeric"
+            max={removeMax > 0 ? removeMax : undefined}
             value={removeQuantity}
             onChange={(event) => setRemoveQuantity(event.target.value)}
           />
+          {selectedRemoveLot ? (
+            <>
+              <p>{selectedRemoveLot.quantity} available</p>
+              <p>{selectedRemoveLot.expiration_date ?? "No expiration"}</p>
+            </>
+          ) : (
+            <p>
+              {removeMax} available at {removeLocationName}
+            </p>
+          )}
           <div className="flex flex-col gap-1">
             <label htmlFor="remove-location" className="text-sm font-medium">
               Location
@@ -506,7 +557,7 @@ export function InventoryProductScreen({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="danger" disabled={pending}>
+            <Button type="submit" variant="danger" disabled={pending || removeBlocked}>
               Remove
             </Button>
             <Button type="button" variant="secondary" onClick={closeDialog}>
@@ -533,9 +584,20 @@ export function InventoryProductScreen({
             id="move-quantity"
             label="Quantity"
             inputMode="numeric"
+            max={moveMax > 0 ? moveMax : undefined}
             value={moveQuantity}
             onChange={(event) => setMoveQuantity(event.target.value)}
           />
+          <p>
+            {moveMax} available at {moveSourceName}
+          </p>
+          <p>Oldest lots are used first.</p>
+          {lotsAtMoveSource.map((lot) => (
+            <div key={lot.lot_id}>
+              <p>{lot.quantity}</p>
+              <p>{lot.expiration_date ?? "No expiration"}</p>
+            </div>
+          ))}
           <div className="flex flex-col gap-1">
             <label htmlFor="move-source" className="text-sm font-medium">
               Source
@@ -582,7 +644,7 @@ export function InventoryProductScreen({
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={pending || sameMoveLocation}>
+            <Button type="submit" disabled={pending || moveBlocked}>
               Move
             </Button>
             <Button type="button" variant="secondary" onClick={closeDialog}>
