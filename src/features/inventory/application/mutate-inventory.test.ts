@@ -10,7 +10,7 @@ import { productRepository } from "@/features/products/repositories/product-repo
 import { getHouseholdDb, resetHouseholdDbForTests } from "@/lib/db";
 import type { Household, InventoryLot, Location, Product } from "@/lib/db";
 import { inventoryRepository } from "../repositories/inventory-repository";
-import { addInventory, removeInventory } from "./mutate-inventory";
+import { addInventory, moveInventory, removeInventory } from "./mutate-inventory";
 
 const HOUSEHOLD_A = "household-a";
 const HOUSEHOLD_B = "household-b";
@@ -233,6 +233,34 @@ describe("addInventory", () => {
     expect(lots).toHaveLength(2);
     expect(lots.map((row) => row.quantity).sort()).toEqual([2, 3]);
   });
+
+  it("rejects zero and negative quantities", async () => {
+    await seedHousehold(HOUSEHOLD_A);
+
+    expect(
+      await addInventory({
+        household_id: HOUSEHOLD_A,
+        user_id: USER,
+        product_id: PRODUCT_A,
+        location_id: LOCATION_A,
+        quantity: 0,
+        operation_id: "op-add-zero",
+      }),
+    ).toEqual({ ok: false, code: "invalid_quantity" });
+
+    expect(
+      await addInventory({
+        household_id: HOUSEHOLD_A,
+        user_id: USER,
+        product_id: PRODUCT_A,
+        location_id: LOCATION_A,
+        quantity: -1,
+        operation_id: "op-add-neg",
+      }),
+    ).toEqual({ ok: false, code: "invalid_quantity" });
+    expect(await historyRows()).toHaveLength(0);
+    expect(await outboxRows()).toHaveLength(0);
+  });
 });
 
 describe("removeInventory", () => {
@@ -420,6 +448,36 @@ describe("removeInventory", () => {
     ]);
     expect(history[0]?.delta).toBe(-3);
   });
+
+  it("rejects zero and negative quantities", async () => {
+    await seedHousehold(HOUSEHOLD_A);
+    await inventoryRepository.putLot(lot({ id: "lot-1", quantity: 4 }));
+
+    expect(
+      await removeInventory({
+        household_id: HOUSEHOLD_A,
+        user_id: USER,
+        product_id: PRODUCT_A,
+        location_id: LOCATION_A,
+        quantity: 0,
+        operation_id: "op-rm-zero",
+      }),
+    ).toEqual({ ok: false, code: "invalid_quantity" });
+
+    expect(
+      await removeInventory({
+        household_id: HOUSEHOLD_A,
+        user_id: USER,
+        product_id: PRODUCT_A,
+        location_id: LOCATION_A,
+        quantity: -2,
+        operation_id: "op-rm-neg",
+      }),
+    ).toEqual({ ok: false, code: "invalid_quantity" });
+    expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "lot-1")).toMatchObject({
+      quantity: 4,
+    });
+  });
 });
 
 describe("atomicity and isolation", () => {
@@ -446,6 +504,35 @@ describe("atomicity and isolation", () => {
     expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "lot-1")).toMatchObject({
       quantity: 4,
     });
+    expect(await historyRows()).toHaveLength(0);
+    expect(await outboxRows()).toHaveLength(0);
+  });
+
+  it("rolls back an add when outbox insertion fails", async () => {
+    await seedHousehold(HOUSEHOLD_A);
+
+    const db = getHouseholdDb();
+    db.pending_operations.hook("creating", () => {
+      throw new Error("outbox fail");
+    });
+
+    const result = await addInventory({
+      household_id: HOUSEHOLD_A,
+      user_id: USER,
+      product_id: PRODUCT_A,
+      location_id: LOCATION_A,
+      quantity: 2,
+      operation_id: "op-add-outbox-fail",
+    });
+
+    expect(result).toEqual({ ok: false, code: "persistence_failure" });
+    expect(
+      await inventoryRepository.listLotsForProductAtLocation(
+        HOUSEHOLD_A,
+        PRODUCT_A,
+        LOCATION_A,
+      ),
+    ).toEqual([]);
     expect(await historyRows()).toHaveLength(0);
     expect(await outboxRows()).toHaveLength(0);
   });
@@ -551,7 +638,276 @@ describe("atomicity and isolation", () => {
       }),
     ).toEqual({ ok: false, code: "invalid_lot" });
   });
+});
 
+describe("moveInventory", () => {
+  async function seedMoveHousehold(): Promise<void> {
+    await seedHousehold(HOUSEHOLD_A);
+    await locationRepository.put(location(LOCATION_B, HOUSEHOLD_A));
+  }
+
+  it("moves stock, preserves expiration, and writes two command rows", async () => {
+    await seedMoveHousehold();
+    await inventoryRepository.putLot(
+      lot({ id: "src-dated", quantity: 4, expiration_date: "2027-01-10" }),
+    );
+
+    const result = await moveInventory({
+      household_id: HOUSEHOLD_A,
+      user_id: USER,
+      product_id: PRODUCT_A,
+      source_location_id: LOCATION_A,
+      destination_location_id: LOCATION_B,
+      quantity: 3,
+      operation_id: "op-move-src",
+      destination_operation_id: "op-move-dest",
+      client_created_at: "2026-09-09T10:00:00.000Z",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.operation_id).toBe("op-move-src");
+    expect(result.value.destination_operation_id).toBe("op-move-dest");
+    expect(result.value.operation_id).not.toBe(result.value.destination_operation_id);
+
+    expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "src-dated")).toMatchObject({
+      quantity: 1,
+      expiration_date: "2027-01-10",
+    });
+    const destLots = await inventoryRepository.listLotsForProductAtLocation(
+      HOUSEHOLD_A,
+      PRODUCT_A,
+      LOCATION_B,
+    );
+    expect(destLots).toHaveLength(1);
+    expect(destLots[0]).toMatchObject({
+      quantity: 3,
+      expiration_date: "2027-01-10",
+    });
+
+    const history = await historyRows();
+    const pending = await outboxRows();
+    expect(history).toHaveLength(2);
+    expect(pending).toHaveLength(2);
+    expect(history.map((row) => row.operation_id).sort()).toEqual([
+      "op-move-dest",
+      "op-move-src",
+    ]);
+    expect(pending.map((row) => row.operation_id).sort()).toEqual([
+      "op-move-dest",
+      "op-move-src",
+    ]);
+
+    const removeRow = pending.find((row) => row.operation_id === "op-move-src");
+    const addRow = pending.find((row) => row.operation_id === "op-move-dest");
+    expect(removeRow?.payload).toEqual({
+      product_id: PRODUCT_A,
+      location_id: LOCATION_A,
+      operation_type: "REMOVE",
+      allocations: [{ inventory_lot_id: "src-dated", delta: -3 }],
+      client_created_at: "2026-09-09T10:00:00.000Z",
+    });
+    expect(removeRow?.payload).not.toHaveProperty("quantity");
+    expect(addRow?.payload.operation_type).toBe("ADD");
+    expect(addRow?.payload.location_id).toBe(LOCATION_B);
+    expect(addRow?.payload.allocations).toEqual([
+      {
+        inventory_lot_id: destLots[0]?.id,
+        delta: 3,
+        expiration_date: "2027-01-10",
+      },
+    ]);
+    expect(addRow?.payload).not.toHaveProperty("quantity");
+  });
+
+  it("merges the destination lot when expiration matches and creates one when it differs", async () => {
+    await seedMoveHousehold();
+    await inventoryRepository.putLot(
+      lot({ id: "src-soon", quantity: 2, expiration_date: "2027-01-10" }),
+    );
+    await inventoryRepository.putLot(
+      lot({ id: "src-later", quantity: 2, expiration_date: "2027-06-20" }),
+    );
+    await inventoryRepository.putLot(
+      lot({
+        id: "dest-soon",
+        location_id: LOCATION_B,
+        quantity: 1,
+        expiration_date: "2027-01-10",
+      }),
+    );
+
+    const result = await moveInventory({
+      household_id: HOUSEHOLD_A,
+      user_id: USER,
+      product_id: PRODUCT_A,
+      source_location_id: LOCATION_A,
+      destination_location_id: LOCATION_B,
+      quantity: 3,
+      operation_id: "op-merge-src",
+      destination_operation_id: "op-merge-dest",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "dest-soon")).toMatchObject({
+      quantity: 3,
+    });
+    const destLots = await inventoryRepository.listLotsForProductAtLocation(
+      HOUSEHOLD_A,
+      PRODUCT_A,
+      LOCATION_B,
+    );
+    expect(destLots).toHaveLength(2);
+    expect(
+      destLots.find((row) => row.expiration_date === "2027-06-20")?.quantity,
+    ).toBe(1);
+  });
+
+  it("uses FEFO at the source and leaves undated lots last", async () => {
+    await seedMoveHousehold();
+    await inventoryRepository.putLot(
+      lot({ id: "undated", quantity: 4, expiration_date: null }),
+    );
+    await inventoryRepository.putLot(
+      lot({ id: "later", quantity: 3, expiration_date: "2027-06-20" }),
+    );
+    await inventoryRepository.putLot(
+      lot({ id: "soon", quantity: 2, expiration_date: "2027-01-10" }),
+    );
+
+    const result = await moveInventory({
+      household_id: HOUSEHOLD_A,
+      user_id: USER,
+      product_id: PRODUCT_A,
+      source_location_id: LOCATION_A,
+      destination_location_id: LOCATION_B,
+      quantity: 4,
+      operation_id: "op-fefo-src",
+      destination_operation_id: "op-fefo-dest",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "soon")).toMatchObject({
+      quantity: 0,
+    });
+    expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "later")).toMatchObject({
+      quantity: 1,
+    });
+    expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "undated")).toMatchObject({
+      quantity: 4,
+    });
+  });
+
+  it("rejects insufficient source stock and same-location moves", async () => {
+    await seedMoveHousehold();
+    await inventoryRepository.putLot(lot({ id: "src-1", quantity: 1 }));
+
+    expect(
+      await moveInventory({
+        household_id: HOUSEHOLD_A,
+        user_id: USER,
+        product_id: PRODUCT_A,
+        source_location_id: LOCATION_A,
+        destination_location_id: LOCATION_B,
+        quantity: 2,
+        operation_id: "op-short-src",
+        destination_operation_id: "op-short-dest",
+      }),
+    ).toEqual({ ok: false, code: "insufficient_stock" });
+    expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "src-1")).toMatchObject({
+      quantity: 1,
+    });
+    expect(await historyRows()).toHaveLength(0);
+    expect(await outboxRows()).toHaveLength(0);
+
+    expect(
+      await moveInventory({
+        household_id: HOUSEHOLD_A,
+        user_id: USER,
+        product_id: PRODUCT_A,
+        source_location_id: LOCATION_A,
+        destination_location_id: LOCATION_A,
+        quantity: 1,
+        operation_id: "op-same-src",
+        destination_operation_id: "op-same-dest",
+      }),
+    ).toEqual({ ok: false, code: "invalid_move" });
+  });
+
+  it("rejects wrong-household product and locations", async () => {
+    await seedBothHouseholds();
+    await locationRepository.put(location(LOCATION_A, HOUSEHOLD_B));
+
+    expect(
+      await moveInventory({
+        household_id: HOUSEHOLD_A,
+        user_id: USER,
+        product_id: PRODUCT_B,
+        source_location_id: LOCATION_A,
+        destination_location_id: LOCATION_B,
+        quantity: 1,
+        operation_id: "op-bad-prod-src",
+        destination_operation_id: "op-bad-prod-dest",
+      }),
+    ).toEqual({ ok: false, code: "invalid_product" });
+
+    expect(
+      await moveInventory({
+        household_id: HOUSEHOLD_A,
+        user_id: USER,
+        product_id: PRODUCT_A,
+        source_location_id: LOCATION_B,
+        destination_location_id: LOCATION_A,
+        quantity: 1,
+        operation_id: "op-bad-src",
+        destination_operation_id: "op-bad-src-dest",
+      }),
+    ).toEqual({ ok: false, code: "invalid_location" });
+  });
+
+  it("rolls back both locations and outbox when the second outbox insert fails", async () => {
+    await seedMoveHousehold();
+    await inventoryRepository.putLot(lot({ id: "src-1", quantity: 4 }));
+
+    const db = getHouseholdDb();
+    let creates = 0;
+    db.pending_operations.hook("creating", () => {
+      creates += 1;
+      if (creates === 2) {
+        throw new Error("outbox fail");
+      }
+    });
+
+    const result = await moveInventory({
+      household_id: HOUSEHOLD_A,
+      user_id: USER,
+      product_id: PRODUCT_A,
+      source_location_id: LOCATION_A,
+      destination_location_id: LOCATION_B,
+      quantity: 2,
+      operation_id: "op-rb-src",
+      destination_operation_id: "op-rb-dest",
+    });
+
+    expect(result).toEqual({ ok: false, code: "persistence_failure" });
+    expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "src-1")).toMatchObject({
+      quantity: 4,
+    });
+    expect(
+      await inventoryRepository.listLotsForProductAtLocation(
+        HOUSEHOLD_A,
+        PRODUCT_A,
+        LOCATION_B,
+      ),
+    ).toEqual([]);
+    expect(await historyRows()).toHaveLength(0);
+    expect(await outboxRows()).toHaveLength(0);
+  });
+});
+
+describe("source scan", () => {
   it("has no Next, React, Supabase, or fetch imports", () => {
     const source = readFileSync(
       join(dirname(fileURLToPath(import.meta.url)), "mutate-inventory.ts"),

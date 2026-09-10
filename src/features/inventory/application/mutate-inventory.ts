@@ -13,8 +13,9 @@ import {
   applyLotDelta,
   selectLotsForConsumption,
 } from "@/lib/domain/inventory/lots";
+import { validateMove } from "@/lib/domain/inventory/move";
 import { validateInventoryOperation } from "@/lib/domain/inventory/operations";
-import { isPositiveInteger } from "@/lib/domain/inventory/stock";
+import { isPositiveInteger, totalQuantity } from "@/lib/domain/inventory/stock";
 import { createOperationId } from "@/lib/sync/operation-id";
 import { createPendingOperation, enqueue } from "@/lib/sync/outbox";
 import { inventoryOperationRepository } from "../repositories/inventory-operation-repository";
@@ -28,6 +29,7 @@ export type InventoryMutationErrorCode =
   | "invalid_location"
   | "invalid_lot"
   | "invalid_operation"
+  | "invalid_move"
   | "persistence_failure";
 
 export type InventoryMutationResult<T> =
@@ -62,6 +64,24 @@ export type InventoryMutationSuccess = {
   lots: InventoryLot[];
 };
 
+export type MoveInventoryInput = {
+  household_id: string;
+  user_id: string;
+  product_id: string;
+  source_location_id: string;
+  destination_location_id: string;
+  quantity: number;
+  operation_id?: string;
+  destination_operation_id?: string;
+  client_created_at?: string;
+};
+
+export type MoveInventorySuccess = {
+  operation_id: string;
+  destination_operation_id: string;
+  lots: InventoryLot[];
+};
+
 type MutationPlan = {
   lots: InventoryLot[];
   inventory_lot_id: string | null;
@@ -92,7 +112,8 @@ function mapDomainCode(code: DomainErrorCode): InventoryMutationErrorCode {
   if (
     code === "invalid_quantity" ||
     code === "insufficient_stock" ||
-    code === "invalid_operation"
+    code === "invalid_operation" ||
+    code === "invalid_move"
   ) {
     return code;
   }
@@ -495,5 +516,219 @@ export async function removeInventory(
 
     await persistPlan(input, operationId, createdAt, clientCreatedAt, planned.value);
     return mutationOk({ operation_id: operationId, lots: planned.value.lots });
+  });
+}
+
+async function loadMoveContext(
+  input: MoveInventoryInput,
+): Promise<InventoryMutationResult<void>> {
+  if (!isNonEmpty(input.household_id)) {
+    return mutationErr("invalid_household");
+  }
+
+  const household = await householdRepository.getById(input.household_id);
+  if (!household) {
+    return mutationErr("invalid_household");
+  }
+
+  const product = await productRepository.getById(
+    input.household_id,
+    input.product_id,
+  );
+  if (!product) {
+    return mutationErr("invalid_product");
+  }
+
+  const source = await locationRepository.getById(
+    input.household_id,
+    input.source_location_id,
+  );
+  const destination = await locationRepository.getById(
+    input.household_id,
+    input.destination_location_id,
+  );
+  if (!source || !destination) {
+    return mutationErr("invalid_location");
+  }
+
+  return { ok: true, value: undefined };
+}
+
+async function planMoveDestination(
+  input: MoveInventoryInput,
+  sourcePlan: MutationPlan,
+  destinationOperationId: string,
+  now: string,
+): Promise<InventoryMutationResult<MutationPlan>> {
+  const sourceLotsById = new Map(sourcePlan.lots.map((lot) => [lot.id, lot]));
+  const grouped = new Map<string | null, number>();
+
+  for (const allocation of sourcePlan.allocations) {
+    const sourceLot = sourceLotsById.get(allocation.inventory_lot_id);
+    if (!sourceLot) {
+      return mutationErr("invalid_lot");
+    }
+    grouped.set(
+      sourceLot.expiration_date,
+      (grouped.get(sourceLot.expiration_date) ?? 0) - allocation.delta,
+    );
+  }
+
+  const destInput: AddInventoryInput = {
+    household_id: input.household_id,
+    user_id: input.user_id,
+    product_id: input.product_id,
+    location_id: input.destination_location_id,
+    quantity: input.quantity,
+  };
+
+  const written: InventoryLot[] = [];
+  const plannedAllocations: InventoryAllocationPayload[] = [];
+
+  for (const [expirationDate, quantity] of grouped) {
+    const lotResult = await resolveAddLot(
+      destInput,
+      expirationDate,
+      crypto.randomUUID(),
+      now,
+    );
+    if (!lotResult.ok) {
+      return lotResult;
+    }
+
+    const nextQuantity = applyLotDelta(lotResult.value, quantity);
+    if (!nextQuantity.ok) {
+      return mutationErr(mapDomainCode(nextQuantity.code));
+    }
+
+    written.push({
+      ...lotResult.value,
+      quantity: nextQuantity.value,
+      updated_at: now,
+    });
+    plannedAllocations.push({
+      inventory_lot_id: lotResult.value.id,
+      delta: quantity,
+      expiration_date: lotResult.value.expiration_date,
+    });
+  }
+
+  const operation = validateInventoryOperation({
+    operation_id: destinationOperationId,
+    household_id: input.household_id,
+    product_id: input.product_id,
+    location_id: input.destination_location_id,
+    delta: input.quantity,
+    operation_type: "ADD",
+  });
+  if (!operation.ok) {
+    return mutationErr(mapDomainCode(operation.code));
+  }
+
+  return {
+    ok: true,
+    value: {
+      lots: written,
+      inventory_lot_id: written.length === 1 ? written[0].id : null,
+      delta: input.quantity,
+      operation_type: "ADD",
+      allocations: plannedAllocations,
+    },
+  };
+}
+
+export async function moveInventory(
+  input: MoveInventoryInput,
+): Promise<InventoryMutationResult<MoveInventorySuccess>> {
+  const common = validateCommon(input);
+  if (common) {
+    return mutationErr(common);
+  }
+
+  const operationId = input.operation_id ?? createOperationId();
+  const destinationOperationId =
+    input.destination_operation_id ?? createOperationId();
+  const createdAt = new Date().toISOString();
+  const clientCreatedAt = input.client_created_at ?? createdAt;
+
+  return runInTransaction(async () => {
+    const context = await loadMoveContext(input);
+    if (!context.ok) {
+      return context;
+    }
+
+    const sourceLots = await inventoryRepository.listLotsForProductAtLocation(
+      input.household_id,
+      input.product_id,
+      input.source_location_id,
+    );
+    const move = validateMove({
+      sourceLocationId: input.source_location_id,
+      destinationLocationId: input.destination_location_id,
+      quantity: input.quantity,
+      sourceQuantity: totalQuantity(sourceLots),
+    });
+    if (!move.ok) {
+      return mutationErr(mapDomainCode(move.code));
+    }
+
+    const sourcePlan = await planRemove(
+      {
+        household_id: input.household_id,
+        user_id: input.user_id,
+        product_id: input.product_id,
+        location_id: input.source_location_id,
+        quantity: input.quantity,
+      },
+      operationId,
+      createdAt,
+    );
+    if (!sourcePlan.ok) {
+      return sourcePlan;
+    }
+
+    const destPlan = await planMoveDestination(
+      input,
+      sourcePlan.value,
+      destinationOperationId,
+      createdAt,
+    );
+    if (!destPlan.ok) {
+      return destPlan;
+    }
+
+    await persistPlan(
+      {
+        household_id: input.household_id,
+        user_id: input.user_id,
+        product_id: input.product_id,
+        location_id: input.source_location_id,
+      },
+      operationId,
+      createdAt,
+      clientCreatedAt,
+      sourcePlan.value,
+    );
+    await persistPlan(
+      {
+        household_id: input.household_id,
+        user_id: input.user_id,
+        product_id: input.product_id,
+        location_id: input.destination_location_id,
+      },
+      destinationOperationId,
+      createdAt,
+      clientCreatedAt,
+      destPlan.value,
+    );
+
+    return {
+      ok: true,
+      value: {
+        operation_id: operationId,
+        destination_operation_id: destinationOperationId,
+        lots: [...sourcePlan.value.lots, ...destPlan.value.lots],
+      },
+    };
   });
 }
