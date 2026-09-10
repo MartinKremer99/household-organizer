@@ -284,8 +284,7 @@ describe("manage-products", () => {
     expect(source).not.toMatch(/from ["']next\//);
     expect(source).not.toMatch(/from ["']react(?:\/|["'])/);
     expect(source).not.toMatch(/@\/lib\/supabase/);
-    expect(source).not.toMatch(/@\/lib\/sync/);
-    expect(source).not.toMatch(/outbox/);
     expect(source).not.toMatch(/createClient/);
+    expect(source).toMatch(/@\/lib\/sync\/outbox/);
   });
 });

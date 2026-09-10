@@ -13,8 +13,8 @@ test.beforeAll(async () => {
   await skipIfNoLocalSupabase();
 });
 
-test.fixme(
-  "dated lots appear on the product and Home until they are removed — production never writes a Dexie household row after create",
+test(
+  "dated lots appear on the product and Home until they are removed",
   async ({ browser }) => {
   const { context, page } = await openUserContext(browser);
   const soon = localIsoDate(3);

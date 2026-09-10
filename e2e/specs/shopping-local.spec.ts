@@ -17,8 +17,8 @@ test.beforeAll(async () => {
   await skipIfNoLocalSupabase();
 });
 
-test.fixme(
-  "product shopping can be purchased and partially put away — production never writes a Dexie household row after create",
+test(
+  "product shopping can be purchased and partially put away",
   async ({ browser }) => {
   const { context, page } = await openUserContext(browser);
 
@@ -47,8 +47,8 @@ test.fixme(
   }
 });
 
-test.fixme(
-  "free-text shopping is stored without creating inventory — production never writes a Dexie household row after create",
+test(
+  "free-text shopping is stored without creating inventory",
   async ({ browser }) => {
   const { context, page } = await openUserContext(browser);
 

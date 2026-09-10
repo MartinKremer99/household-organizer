@@ -340,7 +340,7 @@ export async function addProductShoppingItem(
   }
 
   return runShoppingTransaction(
-    ["households", "products", "shopping_items"],
+    ["households", "products", "shopping_items", "pending_operations"],
     async () => {
       const householdError = await requireHousehold(input.household_id);
       if (householdError) {
@@ -380,6 +380,19 @@ export async function addProductShoppingItem(
           updated_at: new Date().toISOString(),
         };
         await shoppingRepository.put(next);
+        await enqueue(
+          createPendingOperation({
+            household_id: input.household_id,
+            operation_id: createOperationId(),
+            operation_type: "ADD_SHOPPING_ITEM",
+            payload: {
+              id: next.id,
+              product_id: next.product_id,
+              free_text: null,
+              quantity: validated.value.quantity,
+            },
+          }),
+        );
         return ok(next);
       }
 
@@ -394,6 +407,19 @@ export async function addProductShoppingItem(
         now,
       });
       await shoppingRepository.put(record);
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "ADD_SHOPPING_ITEM",
+          payload: {
+            id: record.id,
+            product_id: record.product_id,
+            free_text: null,
+            quantity: record.quantity,
+          },
+        }),
+      );
       return ok(record);
     },
   );
@@ -416,7 +442,9 @@ export async function addFreeTextShoppingItem(
     return fail(mapDomainCode(validated.code));
   }
 
-  return runShoppingTransaction(["households", "shopping_items"], async () => {
+  return runShoppingTransaction(
+    ["households", "shopping_items", "pending_operations"],
+    async () => {
     const householdError = await requireHousehold(input.household_id);
     if (householdError) {
       return fail(householdError);
@@ -444,6 +472,19 @@ export async function addFreeTextShoppingItem(
       now,
     });
     await shoppingRepository.put(record);
+    await enqueue(
+      createPendingOperation({
+        household_id: input.household_id,
+        operation_id: createOperationId(),
+        operation_type: "ADD_SHOPPING_ITEM",
+        payload: {
+          id: record.id,
+          product_id: null,
+          free_text: record.free_text,
+          quantity: record.quantity,
+        },
+      }),
+    );
     return ok(record);
   });
 }
@@ -451,7 +492,9 @@ export async function addFreeTextShoppingItem(
 export async function changeShoppingQuantity(
   input: ChangeShoppingQuantityInput,
 ): Promise<ShoppingResult<ShoppingItem>> {
-  return runShoppingTransaction(["households", "shopping_items"], async () => {
+  return runShoppingTransaction(
+    ["households", "shopping_items", "pending_operations"],
+    async () => {
     const householdError = await requireHousehold(input.household_id);
     if (householdError) {
       return fail(householdError);
@@ -483,6 +526,14 @@ export async function changeShoppingQuantity(
       updated_at: new Date().toISOString(),
     };
     await shoppingRepository.put(next);
+    await enqueue(
+      createPendingOperation({
+        household_id: input.household_id,
+        operation_id: createOperationId(),
+        operation_type: "CHANGE_SHOPPING_QUANTITY",
+        payload: { id: next.id, quantity: next.quantity },
+      }),
+    );
     return ok(next);
   });
 }
@@ -496,7 +547,7 @@ export async function markShoppingItemPurchased(
   }
 
   return runShoppingTransaction(
-    ["households", "products", "shopping_items", "purchased_stock"],
+    ["households", "products", "shopping_items", "purchased_stock", "pending_operations"],
     async () => {
       const householdError = await requireHousehold(input.household_id);
       if (householdError) {
@@ -539,6 +590,14 @@ export async function markShoppingItemPurchased(
         );
       }
 
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "MARK_SHOPPING_PURCHASED",
+          payload: { id: next.id },
+        }),
+      );
       return ok(next);
     },
   );
@@ -678,7 +737,7 @@ export async function consumePurchasedStock(
   input: ConsumePurchasedStockInput,
 ): Promise<ShoppingResult<ConsumeSuccess>> {
   return runShoppingTransaction(
-    ["households", "products", "shopping_items", "purchased_stock"],
+    ["households", "products", "shopping_items", "purchased_stock", "pending_operations"],
     async () => {
       const householdError = await requireHousehold(input.household_id);
       if (householdError) {
@@ -724,6 +783,17 @@ export async function consumePurchasedStock(
         now,
       );
       await storePurchasedProductItems(toStore.value, now);
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "CONSUME_PURCHASED_STOCK",
+          payload: {
+            product_id: input.product_id,
+            quantity: input.quantity,
+          },
+        }),
+      );
 
       return ok({ remaining_quantity: consumed.value.remaining });
     },
@@ -733,7 +803,9 @@ export async function consumePurchasedStock(
 export async function markFreeTextItemStored(
   input: MarkFreeTextItemStoredInput,
 ): Promise<ShoppingResult<ShoppingItem>> {
-  return runShoppingTransaction(["households", "shopping_items"], async () => {
+  return runShoppingTransaction(
+    ["households", "shopping_items", "pending_operations"],
+    async () => {
     const householdError = await requireHousehold(input.household_id);
     if (householdError) {
       return fail(householdError);
@@ -758,6 +830,14 @@ export async function markFreeTextItemStored(
       updated_at: new Date().toISOString(),
     };
     await shoppingRepository.put(next);
+    await enqueue(
+      createPendingOperation({
+        household_id: input.household_id,
+        operation_id: createOperationId(),
+        operation_type: "MARK_FREE_TEXT_STORED",
+        payload: { id: next.id },
+      }),
+    );
     return ok(next);
   });
 }

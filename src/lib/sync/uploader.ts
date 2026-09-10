@@ -1,10 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  CatalogOutboxOperationType,
   InventoryAllocationPayload,
-  InventoryCommandPayload,
+  OutboxOperationType,
   PendingOperation,
   PutAwayPurchasedStockPayload,
+  ShoppingOutboxOperationType,
 } from "@/lib/db";
+import { isInventoryCommandPayload, isPutAwayPurchasedStockPayload } from "@/lib/db";
 import { createClient } from "@/lib/supabase/client";
 import { complete, listPending, markAttempt, markFailed } from "./outbox";
 
@@ -95,23 +98,48 @@ function hasValidAllocations(
   );
 }
 
-function isInventoryCommandPayload(
-  payload: PendingOperation["payload"],
-): payload is InventoryCommandPayload {
-  return "allocations" in payload && Array.isArray(payload.allocations);
+const CATALOG_TYPES = new Set<OutboxOperationType>([
+  "CREATE_CATEGORY",
+  "RENAME_CATEGORY",
+  "ARCHIVE_CATEGORY",
+  "CREATE_LOCATION",
+  "RENAME_LOCATION",
+  "ARCHIVE_LOCATION",
+  "CREATE_PRODUCT",
+  "RENAME_PRODUCT",
+  "CHANGE_PRODUCT_CATEGORY",
+  "CHANGE_PRODUCT_MINIMUM_STOCK",
+  "ARCHIVE_PRODUCT",
+]);
+
+const SHOPPING_TYPES = new Set<OutboxOperationType>([
+  "ADD_SHOPPING_ITEM",
+  "CHANGE_SHOPPING_QUANTITY",
+  "MARK_SHOPPING_PURCHASED",
+  "CONSUME_PURCHASED_STOCK",
+  "MARK_FREE_TEXT_STORED",
+]);
+
+function isCatalogType(
+  type: OutboxOperationType,
+): type is CatalogOutboxOperationType {
+  return CATALOG_TYPES.has(type);
+}
+
+function isShoppingType(
+  type: OutboxOperationType,
+): type is ShoppingOutboxOperationType {
+  return SHOPPING_TYPES.has(type);
 }
 
 function isValidPutAwayPayload(
   payload: PendingOperation["payload"],
 ): payload is PutAwayPurchasedStockPayload {
   return (
-    "quantity" in payload &&
-    typeof payload.quantity === "number" &&
+    isPutAwayPurchasedStockPayload(payload) &&
     Number.isInteger(payload.quantity) &&
     payload.quantity > 0 &&
-    typeof payload.product_id === "string" &&
     payload.product_id.trim().length > 0 &&
-    typeof payload.location_id === "string" &&
     payload.location_id.trim().length > 0
   );
 }
@@ -171,6 +199,24 @@ async function uploadOne(
         error: { code: "invalid_operation", message: "put-away payload is invalid" },
       };
     }
+  } else if (isCatalogType(operation.operation_type)) {
+    if (!("id" in operation.payload) || typeof operation.payload.id !== "string") {
+      await markFailed(householdId, operation.operation_id, "invalid_operation");
+      return {
+        kind: "stop",
+        stop_reason: "business_rejection",
+        error: { code: "invalid_operation", message: "catalog payload is invalid" },
+      };
+    }
+  } else if (isShoppingType(operation.operation_type)) {
+    if (!operation.payload || typeof operation.payload !== "object") {
+      await markFailed(householdId, operation.operation_id, "invalid_operation");
+      return {
+        kind: "stop",
+        stop_reason: "business_rejection",
+        error: { code: "invalid_operation", message: "shopping payload is invalid" },
+      };
+    }
   } else if (
     !isInventoryCommandPayload(operation.payload) ||
     !hasValidAllocations(operation.payload.allocations)
@@ -188,6 +234,11 @@ async function uploadOne(
   let data: unknown;
   let error: unknown;
   try {
+    const clientCreatedAt =
+      "client_created_at" in operation.payload &&
+      typeof operation.payload.client_created_at === "string"
+        ? operation.payload.client_created_at
+        : operation.created_at;
     const response =
       operation.operation_type === "PUT_AWAY_PURCHASED_STOCK" &&
       isValidPutAwayPayload(operation.payload)
@@ -197,22 +248,39 @@ async function uploadOne(
             p_location_id: operation.payload.location_id,
             p_quantity: operation.payload.quantity,
             p_expiration_date: operation.payload.expiration_date ?? null,
-            p_client_created_at:
-              operation.payload.client_created_at ?? operation.created_at,
+            p_client_created_at: clientCreatedAt,
           })
-        : await supabase.rpc("apply_inventory_command", {
-            p_operation_id: operation.operation_id,
-            p_product_id: operation.payload.product_id,
-            p_location_id: operation.payload.location_id,
-            p_operation_type: isInventoryCommandPayload(operation.payload)
-              ? operation.payload.operation_type
-              : "ADD",
-            p_allocations: isInventoryCommandPayload(operation.payload)
-              ? operation.payload.allocations
-              : [],
-            p_client_created_at:
-              operation.payload.client_created_at ?? operation.created_at,
-          });
+        : isCatalogType(operation.operation_type)
+          ? await supabase.rpc("apply_catalog_command", {
+              p_operation_id: operation.operation_id,
+              p_operation_type: operation.operation_type,
+              p_payload: operation.payload,
+              p_client_created_at: clientCreatedAt,
+            })
+          : isShoppingType(operation.operation_type)
+            ? await supabase.rpc("apply_shopping_command", {
+                p_operation_id: operation.operation_id,
+                p_operation_type: operation.operation_type,
+                p_payload: operation.payload,
+                p_client_created_at: clientCreatedAt,
+              })
+        : isInventoryCommandPayload(operation.payload)
+          ? await supabase.rpc("apply_inventory_command", {
+              p_operation_id: operation.operation_id,
+              p_product_id: operation.payload.product_id,
+              p_location_id: operation.payload.location_id,
+              p_operation_type: operation.payload.operation_type,
+              p_allocations: operation.payload.allocations,
+              p_client_created_at: clientCreatedAt,
+            })
+          : await supabase.rpc("apply_inventory_command", {
+              p_operation_id: operation.operation_id,
+              p_product_id: "",
+              p_location_id: "",
+              p_operation_type: "ADD",
+              p_allocations: [],
+              p_client_created_at: clientCreatedAt,
+            });
     data = response.data;
     error = response.error;
   } catch (thrown) {

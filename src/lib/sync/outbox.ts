@@ -1,12 +1,12 @@
 import { getHouseholdDb } from "@/lib/db";
 import type {
   InventoryAllocationPayload,
-  InventoryCommandPayload,
   OutboxOperationType,
   OutboxPayload,
   PendingOperation,
   PutAwayPurchasedStockPayload,
 } from "@/lib/db";
+import { isInventoryCommandPayload, isPutAwayPurchasedStockPayload } from "@/lib/db";
 import { pendingOperationRepository } from "./pending-operation-repository";
 
 export type CreatePendingOperationInput = {
@@ -34,16 +34,10 @@ export function createPendingOperation(
   };
 }
 
-function isInventoryCommandPayload(
-  payload: OutboxPayload,
-): payload is InventoryCommandPayload {
-  return "allocations" in payload && Array.isArray(payload.allocations);
-}
-
 function isPutAwayPayload(
   payload: OutboxPayload,
 ): payload is PutAwayPurchasedStockPayload {
-  return "quantity" in payload && typeof payload.quantity === "number";
+  return isPutAwayPurchasedStockPayload(payload);
 }
 
 function allocationIdentity(allocation: InventoryAllocationPayload): string {
@@ -55,33 +49,51 @@ function allocationIdentity(allocation: InventoryAllocationPayload): string {
   return `${allocation.inventory_lot_id}|${allocation.delta}|${expiration}|${location}`;
 }
 
-function payloadsEqual(left: OutboxPayload, right: OutboxPayload): boolean {
-  if (left.product_id !== right.product_id || left.location_id !== right.location_id) {
-    return false;
+function canonicalize(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "null";
   }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalize).join(",")}]`;
+  }
+  if (typeof value === "object") {
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((key) => `${key}:${canonicalize((value as Record<string, unknown>)[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
 
+function payloadsEqual(left: OutboxPayload, right: OutboxPayload): boolean {
   if (isPutAwayPayload(left) && isPutAwayPayload(right)) {
     return (
+      left.product_id === right.product_id &&
+      left.location_id === right.location_id &&
       left.quantity === right.quantity &&
       (left.expiration_date ?? null) === (right.expiration_date ?? null)
     );
   }
 
-  if (!isInventoryCommandPayload(left) || !isInventoryCommandPayload(right)) {
-    return false;
+  if (isInventoryCommandPayload(left) && isInventoryCommandPayload(right)) {
+    if (
+      left.product_id !== right.product_id ||
+      left.location_id !== right.location_id ||
+      left.operation_type !== right.operation_type
+    ) {
+      return false;
+    }
+
+    const leftIds = left.allocations.map(allocationIdentity).sort();
+    const rightIds = right.allocations.map(allocationIdentity).sort();
+    if (leftIds.length !== rightIds.length) {
+      return false;
+    }
+
+    return leftIds.every((value, index) => value === rightIds[index]);
   }
 
-  if (left.operation_type !== right.operation_type) {
-    return false;
-  }
-
-  const leftIds = left.allocations.map(allocationIdentity).sort();
-  const rightIds = right.allocations.map(allocationIdentity).sort();
-  if (leftIds.length !== rightIds.length) {
-    return false;
-  }
-
-  return leftIds.every((value, index) => value === rightIds[index]);
+  return canonicalize(left) === canonicalize(right);
 }
 
 export async function enqueue(

@@ -13,8 +13,8 @@ test.beforeAll(async () => {
   await skipIfNoLocalSupabase();
 });
 
-test.fixme(
-  "local inventory add, move, and remove update the product UI — production never writes a Dexie household row after create",
+test(
+  "local inventory add, move, and remove update the product UI",
   async ({ browser }) => {
   const { context, page } = await openUserContext(browser);
 

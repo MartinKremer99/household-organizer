@@ -3,6 +3,8 @@ import { productRepository } from "@/features/products/repositories/product-repo
 import { getHouseholdDb } from "@/lib/db";
 import type { Category } from "@/lib/db";
 import { validateCatalogName } from "@/lib/domain/catalog/name";
+import { createOperationId } from "@/lib/sync/operation-id";
+import { createPendingOperation, enqueue } from "@/lib/sync/outbox";
 
 export type CategoryErrorCode =
   | "invalid_household"
@@ -85,11 +87,19 @@ export async function createCategory(
 
   const db = getHouseholdDb();
   try {
-    return await db.transaction("rw", [db.categories], async () => {
+    return await db.transaction("rw", [db.categories, db.pending_operations], async () => {
       if (await nameTaken(input.household_id, name.value)) {
         return fail("duplicate_name");
       }
       await categoryRepository.put(record);
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "CREATE_CATEGORY",
+          payload: { id: record.id, name: record.name },
+        }),
+      );
       return ok(record);
     });
   } catch {
@@ -112,7 +122,7 @@ export async function renameCategory(
 
   const db = getHouseholdDb();
   try {
-    return await db.transaction("rw", [db.categories], async () => {
+    return await db.transaction("rw", [db.categories, db.pending_operations], async () => {
       const existing = await categoryRepository.getById(
         input.household_id,
         input.category_id,
@@ -130,6 +140,14 @@ export async function renameCategory(
         updated_at: new Date().toISOString(),
       };
       await categoryRepository.put(next);
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "RENAME_CATEGORY",
+          payload: { id: next.id, name: next.name },
+        }),
+      );
       return ok(next);
     });
   } catch {
@@ -147,7 +165,7 @@ export async function archiveCategory(
 
   const db = getHouseholdDb();
   try {
-    return await db.transaction("rw", [db.categories, db.products], async () => {
+    return await db.transaction("rw", [db.categories, db.products, db.pending_operations], async () => {
       const existing = await categoryRepository.getById(
         input.household_id,
         input.category_id,
@@ -172,6 +190,14 @@ export async function archiveCategory(
         updated_at: new Date().toISOString(),
       };
       await categoryRepository.put(next);
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "ARCHIVE_CATEGORY",
+          payload: { id: next.id },
+        }),
+      );
       return ok(next);
     });
   } catch {

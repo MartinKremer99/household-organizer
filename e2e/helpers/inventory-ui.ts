@@ -11,7 +11,7 @@ export async function createProductFromInventory(
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("Name").fill(name);
   await dialog.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name, exact: true, level: 1 })).toBeVisible();
 }
 
 export async function addStock(
@@ -64,5 +64,5 @@ export async function openProductFromInventory(page: Page, name: string): Promis
   await page.getByRole("link", { name: "Inventory" }).click();
   await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
   await page.getByRole("link", { name, exact: true }).click();
-  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name, exact: true, level: 1 })).toBeVisible();
 }

@@ -10,6 +10,7 @@ import { inventoryRepository } from "@/features/inventory/repositories/inventory
 import { createClient } from "@/lib/supabase/client";
 import { resetHouseholdDbForTests } from "../db/database";
 import { createPendingOperation, enqueue } from "./outbox";
+import { reconcileHousehold } from "./reconcile";
 import { resetSyncHouseholdForTests, syncHousehold } from "./sync";
 import { syncMetadataRepository } from "./sync-metadata-repository";
 import type { UploadPendingResult } from "./uploader";
@@ -18,6 +19,17 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: vi.fn(() => {
     throw new Error("production createClient must not run in coordinator tests");
   }),
+}));
+
+vi.mock("./reconcile", () => ({
+  reconcileHousehold: vi.fn().mockResolvedValue({
+    ok: true,
+    server_cursor: "2026-09-10T12:00:00.000Z",
+  }),
+}));
+
+vi.mock("@/features/household/application/hydrate-household", () => ({
+  ensureLocalHousehold: vi.fn().mockResolvedValue({ ok: false, code: "no_household" }),
 }));
 
 const USER_A = "user-a";
@@ -80,6 +92,11 @@ beforeEach(async () => {
   await resetHouseholdDbForTests();
   resetSyncHouseholdForTests();
   vi.mocked(createClient).mockClear();
+  vi.mocked(reconcileHousehold).mockClear();
+  vi.mocked(reconcileHousehold).mockResolvedValue({
+    ok: true,
+    server_cursor: "2026-09-10T12:00:00.000Z",
+  });
 });
 
 describe("syncHousehold", () => {
@@ -348,7 +365,7 @@ describe("syncHousehold", () => {
     });
   });
 
-  it("does not modify local inventory", async () => {
+  it("leaves local inventory unchanged when reconcile is a no-op", async () => {
     await putMembership(HOUSEHOLD_A, USER_A);
     await inventoryRepository.putLot({
       id: "lot-1",
@@ -368,6 +385,93 @@ describe("syncHousehold", () => {
 
     expect(await inventoryRepository.getLotById(HOUSEHOLD_A, "lot-1")).toMatchObject({
       quantity: 7,
+    });
+  });
+
+  it("reconciles after empty or completed upload and stores the cursor", async () => {
+    await putMembership(HOUSEHOLD_A, USER_A);
+    const supabase = sessionClient(USER_A);
+
+    await syncHousehold({
+      supabase,
+      uploadPendingOperations: vi.fn().mockResolvedValue(
+        uploadResult({ stop_reason: "empty", uploaded_operation_ids: [] }),
+      ),
+    });
+
+    expect(reconcileHousehold).toHaveBeenCalledWith(HOUSEHOLD_A, supabase);
+    expect(await syncMetadataRepository.get(HOUSEHOLD_A)).toMatchObject({
+      last_status: "synced",
+      last_server_cursor: "2026-09-10T12:00:00.000Z",
+    });
+  });
+
+  it("does not reconcile after business or transient upload stops", async () => {
+    await putMembership(HOUSEHOLD_A, USER_A);
+    const supabase = sessionClient(USER_A);
+
+    await syncHousehold({
+      supabase,
+      uploadPendingOperations: vi.fn().mockResolvedValue(
+        uploadResult({
+          stop_reason: "business_rejection",
+          uploaded_operation_ids: [],
+          stopped_operation_id: "op-2",
+          error: { code: "duplicate_name", message: "duplicate_name" },
+        }),
+      ),
+    });
+    expect(reconcileHousehold).not.toHaveBeenCalled();
+
+    resetSyncHouseholdForTests();
+    await syncHousehold({
+      supabase,
+      uploadPendingOperations: vi.fn().mockResolvedValue(
+        uploadResult({
+          stop_reason: "transient_error",
+          uploaded_operation_ids: [],
+          error: { code: "transient_error", message: "Failed to fetch" },
+        }),
+      ),
+    });
+    expect(reconcileHousehold).not.toHaveBeenCalled();
+  });
+
+  it("hydrates a missing membership then uploads", async () => {
+    const supabase = sessionClient(USER_A);
+    const upload = vi.fn().mockResolvedValue(uploadResult({ stop_reason: "empty", uploaded_operation_ids: [] }));
+    const ensure = vi.fn().mockImplementation(async () => {
+      await putMembership(HOUSEHOLD_A, USER_A);
+      return { ok: true, household: { id: HOUSEHOLD_A, name: "Home", join_code: "ABCDEFGHIJ", created_at: "2026-09-09T10:00:00.000Z", updated_at: "2026-09-09T10:00:00.000Z" } };
+    });
+
+    const result = await syncHousehold({
+      supabase,
+      uploadPendingOperations: upload,
+      ensureLocalHousehold: ensure,
+    });
+
+    expect(ensure).toHaveBeenCalledWith({ userId: USER_A });
+    expect(upload).toHaveBeenCalledWith(HOUSEHOLD_A, { supabase });
+    expect(result.status).toBe("completed");
+  });
+
+  it("records transient failure when reconcile fails after a successful upload", async () => {
+    await putMembership(HOUSEHOLD_A, USER_A);
+    vi.mocked(reconcileHousehold).mockResolvedValue({
+      ok: false,
+      code: "transient_error",
+    });
+
+    const result = await syncHousehold({
+      supabase: sessionClient(USER_A),
+      uploadPendingOperations: vi.fn().mockResolvedValue(uploadResult()),
+    });
+
+    expect(result.status).toBe("transient_error");
+    expect(await syncMetadataRepository.get(HOUSEHOLD_A)).toMatchObject({
+      last_status: "failed",
+      last_error_kind: "transient",
     });
   });
 

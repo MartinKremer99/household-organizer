@@ -127,7 +127,28 @@ export type PutAwayPurchasedStockPayload = {
   client_created_at?: string;
 };
 
-export type OutboxPayload = InventoryCommandPayload | PutAwayPurchasedStockPayload;
+export type CatalogCommandPayload = {
+  id: string;
+  name?: string;
+  category_id?: string;
+  minimum_stock?: number;
+  barcode?: string | null;
+  client_created_at?: string;
+};
+
+export type ShoppingCommandPayload = {
+  id?: string;
+  product_id?: string | null;
+  free_text?: string | null;
+  quantity?: number;
+  client_created_at?: string;
+};
+
+export type OutboxPayload =
+  | InventoryCommandPayload
+  | PutAwayPurchasedStockPayload
+  | CatalogCommandPayload
+  | ShoppingCommandPayload;
 
 export function isInventoryCommandPayload(
   payload: OutboxPayload,
@@ -135,7 +156,51 @@ export function isInventoryCommandPayload(
   return "allocations" in payload && Array.isArray(payload.allocations);
 }
 
-export type OutboxOperationType = "INVENTORY_DELTA" | "PUT_AWAY_PURCHASED_STOCK";
+export function isPutAwayPurchasedStockPayload(
+  payload: OutboxPayload,
+): payload is PutAwayPurchasedStockPayload {
+  return (
+    "quantity" in payload &&
+    typeof payload.quantity === "number" &&
+    "product_id" in payload &&
+    "location_id" in payload &&
+    !("allocations" in payload) &&
+    !("id" in payload) &&
+    !("name" in payload)
+  );
+}
+
+export function isCatalogCommandPayload(
+  payload: OutboxPayload,
+): payload is CatalogCommandPayload {
+  return "id" in payload && typeof payload.id === "string" && !("allocations" in payload);
+}
+
+export type CatalogOutboxOperationType =
+  | "CREATE_CATEGORY"
+  | "RENAME_CATEGORY"
+  | "ARCHIVE_CATEGORY"
+  | "CREATE_LOCATION"
+  | "RENAME_LOCATION"
+  | "ARCHIVE_LOCATION"
+  | "CREATE_PRODUCT"
+  | "RENAME_PRODUCT"
+  | "CHANGE_PRODUCT_CATEGORY"
+  | "CHANGE_PRODUCT_MINIMUM_STOCK"
+  | "ARCHIVE_PRODUCT";
+
+export type ShoppingOutboxOperationType =
+  | "ADD_SHOPPING_ITEM"
+  | "CHANGE_SHOPPING_QUANTITY"
+  | "MARK_SHOPPING_PURCHASED"
+  | "CONSUME_PURCHASED_STOCK"
+  | "MARK_FREE_TEXT_STORED";
+
+export type OutboxOperationType =
+  | "INVENTORY_DELTA"
+  | "PUT_AWAY_PURCHASED_STOCK"
+  | CatalogOutboxOperationType
+  | ShoppingOutboxOperationType;
 
 export type PendingOperation = {
   id: string;

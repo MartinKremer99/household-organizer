@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  ensureLocalHousehold,
+  type EnsureLocalHouseholdResult,
+} from "@/features/household/application/hydrate-household";
 import { householdRepository } from "@/features/household/repositories/household-repository";
 import { createClient } from "@/lib/supabase/client";
 import { listPending } from "./outbox";
+import { reconcileHousehold, type ReconcileHouseholdResult } from "./reconcile";
 import { syncMetadataRepository } from "./sync-metadata-repository";
 import {
   uploadPendingOperations,
@@ -11,9 +16,10 @@ import {
 
 /**
  * Explicit household sync entry point.
- * Resolves session + exactly one local membership, then uploads that outbox.
+ * Resolves session + exactly one local membership, uploads the outbox,
+ * then pulls an authoritative snapshot when upload empties or completes.
  * Concurrent calls for the same household share one in-flight Promise.
- * No timers, reconnect listeners, Realtime, or reconciliation.
+ * No timers, reconnect listeners, or Realtime.
  */
 
 export type SyncHouseholdStatus =
@@ -35,6 +41,13 @@ export type SyncHouseholdResult = {
 export type SyncHouseholdOptions = {
   supabase?: SupabaseClient;
   uploadPendingOperations?: typeof uploadPendingOperations;
+  reconcileHousehold?: (
+    householdId: string,
+    supabase: SupabaseClient,
+  ) => Promise<ReconcileHouseholdResult>;
+  ensureLocalHousehold?: (options: {
+    userId: string;
+  }) => Promise<EnsureLocalHouseholdResult>;
 };
 
 const inflight = new Map<string, Promise<SyncHouseholdResult>>();
@@ -95,9 +108,30 @@ export async function syncHousehold(
     return idle("unauthenticated");
   }
 
-  const memberships = await householdRepository.listMembershipsForUser(userId);
+  let memberships = await householdRepository.listMembershipsForUser(userId);
   if (memberships.length !== 1) {
-    return idle("no_household");
+    const ensure = options?.ensureLocalHousehold ?? ensureLocalHousehold;
+    const ensured = await ensure({ userId });
+    if (!ensured.ok) {
+      if (ensured.code === "not_authenticated") {
+        return idle("unauthenticated");
+      }
+      if (ensured.code === "transient_error") {
+        return {
+          status: "transient_error",
+          household_id: null,
+          uploaded_operation_ids: [],
+          stopped_operation_id: null,
+          stop_reason: "transient_error",
+          error: { code: "transient_error", message: "hydrate failed" },
+        };
+      }
+      return idle("no_household");
+    }
+    memberships = await householdRepository.listMembershipsForUser(userId);
+    if (memberships.length !== 1) {
+      return idle("no_household", ensured.household.id);
+    }
   }
 
   const householdId = memberships[0].household_id;
@@ -107,10 +141,12 @@ export async function syncHousehold(
   }
 
   const upload = options?.uploadPendingOperations ?? uploadPendingOperations;
+  const reconcile = options?.reconcileHousehold ?? reconcileHousehold;
   const promise = uploadPendingOperationsForHousehold(
     householdId,
     supabase,
     upload,
+    reconcile,
   ).finally(() => {
     if (inflight.get(householdId) === promise) {
       inflight.delete(householdId);
@@ -123,12 +159,14 @@ export async function syncHousehold(
 async function persistSyncResult(
   householdId: string,
   result: SyncHouseholdResult,
+  serverCursor?: string | null,
 ): Promise<void> {
   if (result.status === "completed") {
     const pending = await listPending(householdId);
     await syncMetadataRepository.recordSuccess(householdId, {
       hasPending: pending.length > 0,
       stopReason: result.stop_reason ?? "completed",
+      lastServerCursor: serverCursor,
     });
     return;
   }
@@ -157,10 +195,34 @@ async function uploadPendingOperationsForHousehold(
   householdId: string,
   supabase: SupabaseClient,
   upload: typeof uploadPendingOperations,
+  reconcile: (
+    householdId: string,
+    supabase: SupabaseClient,
+  ) => Promise<ReconcileHouseholdResult>,
 ): Promise<SyncHouseholdResult> {
   await syncMetadataRepository.markAttemptStarted(householdId);
   const uploaded = await upload(householdId, { supabase });
   const result = mapUpload(householdId, uploaded);
+
+  if (result.status === "completed") {
+    const reconciled = await reconcile(householdId, supabase);
+    if (!reconciled.ok) {
+      const failed: SyncHouseholdResult = {
+        ...result,
+        status: "transient_error",
+        stop_reason: "transient_error",
+        error: {
+          code: reconciled.code,
+          message: reconciled.code,
+        },
+      };
+      await persistSyncResult(householdId, failed);
+      return failed;
+    }
+    await persistSyncResult(householdId, result, reconciled.server_cursor);
+    return result;
+  }
+
   await persistSyncResult(householdId, result);
   return result;
 }

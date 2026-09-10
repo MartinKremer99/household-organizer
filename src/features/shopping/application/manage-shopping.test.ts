@@ -435,7 +435,9 @@ describe("markShoppingItemPurchased", () => {
     });
     expect(await lotRows()).toEqual([]);
     expect(await historyRows()).toEqual([]);
-    expect(await outboxRows()).toEqual([]);
+    expect((await outboxRows()).map((row) => row.operation_type)).toEqual(
+      expect.arrayContaining(["ADD_SHOPPING_ITEM", "MARK_SHOPPING_PURCHASED"]),
+    );
   });
 
   it("consolidates multiple purchases onto one purchased-stock pool", async () => {
@@ -658,16 +660,23 @@ describe("putAwayPurchasedStock", () => {
 
     const history = await historyRows();
     const pending = await outboxRows();
+    const putAway = pending.find((row) => row.operation_type === "PUT_AWAY_PURCHASED_STOCK");
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({
       operation_id: "op-put-partial",
       operation_type: "ADD",
       delta: 1,
     });
-    expect(pending).toHaveLength(1);
-    expect(pending[0]?.operation_id).toBe("op-put-partial");
-    expect(pending[0]?.operation_type).toBe("PUT_AWAY_PURCHASED_STOCK");
-    expect(pending[0]?.payload).toEqual({
+    expect(pending.map((row) => row.operation_type)).toEqual(
+      expect.arrayContaining([
+        "ADD_SHOPPING_ITEM",
+        "MARK_SHOPPING_PURCHASED",
+        "PUT_AWAY_PURCHASED_STOCK",
+      ]),
+    );
+    expect(putAway?.operation_id).toBe("op-put-partial");
+    expect(putAway?.operation_type).toBe("PUT_AWAY_PURCHASED_STOCK");
+    expect(putAway?.payload).toEqual({
       product_id: PRODUCT_A,
       location_id: LOCATION_A,
       quantity: 1,
@@ -737,7 +746,9 @@ describe("putAwayPurchasedStock", () => {
 
     expect(await lotRows()).toEqual([]);
     expect(await historyRows()).toEqual([]);
-    expect(await outboxRows()).toEqual([]);
+    expect(
+      (await outboxRows()).some((row) => row.operation_type === "PUT_AWAY_PURCHASED_STOCK"),
+    ).toBe(false);
     expect(await listPurchasedStockForProduct(HOUSEHOLD_A, PRODUCT_A)).toEqual({
       ok: true,
       value: { product_id: PRODUCT_A, quantity: 2 },
@@ -772,7 +783,9 @@ describe("putAwayPurchasedStock", () => {
     });
     expect(await lotRows()).toEqual([]);
     expect(await historyRows()).toEqual([]);
-    expect(await outboxRows()).toEqual([]);
+    expect(
+      (await outboxRows()).some((row) => row.operation_type === "PUT_AWAY_PURCHASED_STOCK"),
+    ).toBe(false);
   });
 });
 
@@ -800,7 +813,13 @@ describe("consumePurchasedStock", () => {
     expect(partial).toEqual({ ok: true, value: { remaining_quantity: 3 } });
     expect(await listPurchasedShoppingItems(HOUSEHOLD_A)).toHaveLength(1);
     expect(await lotRows()).toEqual([]);
-    expect(await outboxRows()).toEqual([]);
+    expect((await outboxRows()).map((row) => row.operation_type)).toEqual(
+      expect.arrayContaining([
+        "ADD_SHOPPING_ITEM",
+        "MARK_SHOPPING_PURCHASED",
+        "CONSUME_PURCHASED_STOCK",
+      ]),
+    );
 
     const done = await consumePurchasedStock({
       household_id: HOUSEHOLD_A,

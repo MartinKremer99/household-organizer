@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { productRepository } from "@/features/products/repositories/product-repository";
-import { resetHouseholdDbForTests } from "@/lib/db";
+import { getHouseholdDb, resetHouseholdDbForTests } from "@/lib/db";
 import type { Product } from "@/lib/db";
 import {
   archiveCategory,
@@ -48,6 +48,9 @@ describe("manage-categories", () => {
     expect(created.value.is_active).toBe(true);
     expect(created.value.household_id).toBe(HOUSEHOLD_A);
     expect(await listActiveCategories(HOUSEHOLD_A)).toEqual([created.value]);
+    expect(await getHouseholdDb().pending_operations.toArray()).toMatchObject([
+      { operation_type: "CREATE_CATEGORY", payload: { id: created.value.id, name: "Food" } },
+    ]);
   });
 
   it("rejects an empty name", async () => {
@@ -182,8 +185,7 @@ describe("manage-categories", () => {
     expect(source).not.toMatch(/from ["']next\//);
     expect(source).not.toMatch(/from ["']react(?:\/|["'])/);
     expect(source).not.toMatch(/@\/lib\/supabase/);
-    expect(source).not.toMatch(/@\/lib\/sync/);
-    expect(source).not.toMatch(/outbox/);
     expect(source).not.toMatch(/createClient/);
+    expect(source).toMatch(/@\/lib\/sync\/outbox/);
   });
 });

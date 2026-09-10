@@ -69,7 +69,7 @@ export const syncMetadataRepository = {
 
   async recordSuccess(
     householdId: string,
-    input: { hasPending: boolean; stopReason: string },
+    input: { hasPending: boolean; stopReason: string; lastServerCursor?: string | null },
   ): Promise<SyncMetadata> {
     const existing = await read(householdId);
     const next = normalize({
@@ -80,6 +80,10 @@ export const syncMetadataRepository = {
       last_error_code: null,
       last_error_message: null,
       last_stop_reason: input.stopReason,
+      last_server_cursor:
+        input.lastServerCursor === undefined
+          ? existing?.last_server_cursor ?? null
+          : input.lastServerCursor,
     });
     await getHouseholdDb().sync_metadata.put(next);
     return next;

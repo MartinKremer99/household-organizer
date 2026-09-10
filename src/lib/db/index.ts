@@ -8,6 +8,8 @@ export {
   resetHouseholdDbForTests,
 } from "./database";
 export type {
+  CatalogCommandPayload,
+  CatalogOutboxOperationType,
   Category,
   Household,
   HouseholdMember,
@@ -24,10 +26,16 @@ export type {
   Product,
   PurchasedStock,
   PutAwayPurchasedStockPayload,
+  ShoppingCommandPayload,
   ShoppingItem,
   ShoppingItemStatus,
+  ShoppingOutboxOperationType,
   SyncErrorKind,
   SyncLocalStatus,
   SyncMetadata,
 } from "./types";
-export { isInventoryCommandPayload } from "./types";
+export {
+  isCatalogCommandPayload,
+  isInventoryCommandPayload,
+  isPutAwayPurchasedStockPayload,
+} from "./types";

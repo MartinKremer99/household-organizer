@@ -2,6 +2,8 @@ import { locationRepository } from "@/features/locations/repositories/location-r
 import { getHouseholdDb } from "@/lib/db";
 import type { Location } from "@/lib/db";
 import { validateCatalogName } from "@/lib/domain/catalog/name";
+import { createOperationId } from "@/lib/sync/operation-id";
+import { createPendingOperation, enqueue } from "@/lib/sync/outbox";
 
 export type LocationErrorCode =
   | "invalid_household"
@@ -76,7 +78,7 @@ export async function createLocation(
 
   const db = getHouseholdDb();
   try {
-    return await db.transaction("rw", [db.locations], async () => {
+    return await db.transaction("rw", [db.locations, db.pending_operations], async () => {
       if (await nameTaken(input.household_id, name.value)) {
         return fail("duplicate_name");
       }
@@ -99,6 +101,14 @@ export async function createLocation(
         updated_at: now,
       };
       await locationRepository.put(record);
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "CREATE_LOCATION",
+          payload: { id: record.id, name: record.name },
+        }),
+      );
       return ok(record);
     });
   } catch {
@@ -121,7 +131,7 @@ export async function renameLocation(
 
   const db = getHouseholdDb();
   try {
-    return await db.transaction("rw", [db.locations], async () => {
+    return await db.transaction("rw", [db.locations, db.pending_operations], async () => {
       const existing = await locationRepository.getById(
         input.household_id,
         input.location_id,
@@ -139,6 +149,14 @@ export async function renameLocation(
         updated_at: new Date().toISOString(),
       };
       await locationRepository.put(next);
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "RENAME_LOCATION",
+          payload: { id: next.id, name: next.name },
+        }),
+      );
       return ok(next);
     });
   } catch {
@@ -156,7 +174,7 @@ export async function archiveLocation(
 
   const db = getHouseholdDb();
   try {
-    return await db.transaction("rw", [db.locations], async () => {
+    return await db.transaction("rw", [db.locations, db.pending_operations], async () => {
       const existing = await locationRepository.getById(
         input.household_id,
         input.location_id,
@@ -174,6 +192,14 @@ export async function archiveLocation(
         updated_at: new Date().toISOString(),
       };
       await locationRepository.put(next);
+      await enqueue(
+        createPendingOperation({
+          household_id: input.household_id,
+          operation_id: createOperationId(),
+          operation_type: "ARCHIVE_LOCATION",
+          payload: { id: next.id },
+        }),
+      );
       return ok(next);
     });
   } catch {
