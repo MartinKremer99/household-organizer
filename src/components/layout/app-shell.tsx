@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { NetworkStatus } from "@/features/network/ui/network-status";
 import { BottomNav } from "./bottom-nav";
 
 export type AppShellProps = {
@@ -13,6 +14,7 @@ export function AppShell({ actions, status, children }: AppShellProps) {
       <header className="flex items-center justify-between gap-3 border-b border-foreground/15 px-4 py-3">
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-sm font-medium">Household</p>
+          <NetworkStatus />
           {status}
         </div>
         {actions}
