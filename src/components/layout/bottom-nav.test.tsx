@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -79,6 +79,7 @@ describe("presentational UI source", () => {
       join(dirname(fileURLToPath(import.meta.url)), "..", "ui"),
     ];
     const sources = roots
+      .filter((dir) => existsSync(dir))
       .flatMap((dir) => walkFiles(dir))
       .filter((file) => file.endsWith(".tsx") && !file.endsWith(".test.tsx"))
       .map((file) => readFileSync(file, "utf8"))

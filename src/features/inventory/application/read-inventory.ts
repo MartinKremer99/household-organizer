@@ -3,7 +3,7 @@ import { inventoryRepository } from "@/features/inventory/repositories/inventory
 import { locationRepository } from "@/features/locations/repositories/location-repository";
 import { productRepository } from "@/features/products/repositories/product-repository";
 import type { InventoryLot, Location, Product } from "@/lib/db";
-import { isExpiringWithin } from "@/lib/domain/inventory/lots";
+import { isExpired, isExpiringWithin, todayIsoDate } from "@/lib/domain/inventory/lots";
 import { quantityAtLocation, totalQuantity } from "@/lib/domain/inventory/stock";
 import {
   isLowStock,
@@ -44,6 +44,7 @@ export type InventoryLotView = {
   location_name: string | null;
   quantity: number;
   expiration_date: string | null;
+  expired: boolean;
 };
 
 export type ProductInventory = {
@@ -200,6 +201,7 @@ export async function listInventoryOverview(
 export async function getProductInventory(
   householdId: string,
   productId: string,
+  options?: { today?: string },
 ): Promise<InventoryReadResult<ProductInventory>> {
   if (isBlank(householdId)) {
     return { ok: false, code: "invalid_household" };
@@ -222,6 +224,7 @@ export async function getProductInventory(
   const locationsById = new Map(locations.map((row) => [row.id, row]));
   const visibleLots = lots.filter((row) => row.quantity > 0);
 
+  const today = options?.today ?? todayIsoDate();
   const lotViews: InventoryLotView[] = visibleLots
     .map((row) => ({
       lot_id: row.id,
@@ -229,6 +232,7 @@ export async function getProductInventory(
       location_name: locationsById.get(row.location_id)?.name ?? null,
       quantity: row.quantity,
       expiration_date: row.expiration_date,
+      expired: isExpired(row.expiration_date, today),
     }))
     .sort((left, right) => {
       if (left.expiration_date === null && right.expiration_date === null) {

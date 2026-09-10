@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { mapHouseholdError } from "@/lib/supabase/household-errors";
 import { getOwnHouseholdId } from "@/lib/supabase/household";
 import { createClient } from "@/lib/supabase/server";
+import { getLiveUserId } from "@/lib/supabase/session";
 
 export type AuthFormState = { error?: string };
 
@@ -46,19 +48,6 @@ export async function signIn(
   redirect(householdId ? "/" : "/household/setup");
 }
 
-function mapHouseholdError(message: string | undefined): string {
-  if (message?.includes("already_member")) {
-    return "You already belong to a household.";
-  }
-  if (message?.includes("invalid_name")) {
-    return "Enter a household name (1–80 characters).";
-  }
-  if (message?.includes("invalid_join_code")) {
-    return "Invalid join code.";
-  }
-  return "Something went wrong. Try again.";
-}
-
 export async function createHousehold(
   _prev: AuthFormState,
   formData: FormData,
@@ -70,6 +59,11 @@ export async function createHousehold(
   }
 
   const supabase = await createClient();
+  const userId = await getLiveUserId(supabase.auth);
+  if (!userId) {
+    return { error: mapHouseholdError("not_authenticated") };
+  }
+
   const { error } = await supabase.rpc("create_household", { p_name: name });
 
   if (error) {
@@ -91,6 +85,11 @@ export async function joinHousehold(
   }
 
   const supabase = await createClient();
+  const userId = await getLiveUserId(supabase.auth);
+  if (!userId) {
+    return { error: mapHouseholdError("not_authenticated") };
+  }
+
   const { error } = await supabase.rpc("join_household", { p_join_code: joinCode });
 
   if (error) {
@@ -103,11 +102,7 @@ export async function joinHousehold(
 
 export async function signOut() {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
-
-  if (data?.claims) {
-    await supabase.auth.signOut();
-  }
+  await supabase.auth.signOut();
 
   revalidatePath("/", "layout");
   redirect("/login");

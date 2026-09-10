@@ -17,8 +17,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { TextField } from "@/components/ui/text-field";
-import { isExpired } from "@/lib/domain/inventory/lots";
+import { todayIsoDate } from "@/lib/domain/inventory/lots";
 import { isLowStock } from "@/lib/domain/products/low-stock";
+import { expirationRelativeLabel } from "./expiration-copy";
 import { inventoryErrorMessage } from "./inventory-errors";
 
 export type InventoryProductScreenApi = {
@@ -43,13 +44,6 @@ const defaults: InventoryProductScreenApi = {
 const SELECT_CLASS =
   "min-h-11 rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 
-function todayIsoDate(now = new Date()): string {
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function parsePositiveInteger(raw: string): number | null {
   const trimmed = raw.trim();
   if (!/^[1-9]\d*$/.test(trimmed)) {
@@ -72,11 +66,13 @@ export function InventoryProductScreen({
   householdId,
   userId,
   productId,
+  today = todayIsoDate(),
   api,
 }: {
   householdId: string;
   userId: string;
   productId: string;
+  today?: string;
   api?: Partial<InventoryProductScreenApi>;
 }) {
   const inventory = useMemo(() => ({ ...defaults, ...api }), [api]);
@@ -97,7 +93,6 @@ export function InventoryProductScreen({
   const [moveQuantity, setMoveQuantity] = useState("");
   const [moveSourceId, setMoveSourceId] = useState("");
   const [moveDestId, setMoveDestId] = useState("");
-  const today = todayIsoDate();
 
   useEffect(() => {
     locationsLoadedRef.current = false;
@@ -111,7 +106,7 @@ export function InventoryProductScreen({
       : inventory.listActiveLocations(householdId);
 
     void Promise.all([
-      inventory.getProductInventory(householdId, productId),
+      inventory.getProductInventory(householdId, productId, { today }),
       catalogPromise,
     ])
       .then(([result, nextLocations]) => {
@@ -144,7 +139,7 @@ export function InventoryProductScreen({
     return () => {
       cancelled = true;
     };
-  }, [householdId, inventory, productId]);
+  }, [householdId, inventory, productId, today]);
 
   const stockedLocations = product?.locations ?? [];
   const lotsAtRemoveLocation = (product?.lots ?? []).filter(
@@ -186,7 +181,7 @@ export function InventoryProductScreen({
   }
 
   async function refreshProduct() {
-    const result = await inventory.getProductInventory(householdId, productId);
+    const result = await inventory.getProductInventory(householdId, productId, { today });
     if (!result.ok) {
       setMissing(true);
       setProduct(null);
@@ -362,7 +357,10 @@ export function InventoryProductScreen({
             ) : (
               <ul className="flex flex-col gap-2">
                 {product.lots.map((lot) => {
-                  const expired = isExpired(lot.expiration_date, today);
+                  const relative =
+                    lot.expiration_date && !lot.expired
+                      ? expirationRelativeLabel(today, lot.expiration_date)
+                      : null;
                   return (
                     <li key={lot.lot_id}>
                       <p>
@@ -373,7 +371,8 @@ export function InventoryProductScreen({
                           ? "No expiration"
                           : lot.expiration_date}
                       </p>
-                      {expired ? <p>Expired</p> : null}
+                      {relative ? <p>{relative}</p> : null}
+                      {lot.expired ? <p>Expired</p> : null}
                     </li>
                   );
                 })}

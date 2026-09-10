@@ -48,7 +48,8 @@ const milk: ProductInventory = {
       location_id: "loc-1",
       location_name: "Kitchen",
       quantity: 2,
-      expiration_date: "2027-01-10",
+      expiration_date: "2026-09-12",
+      expired: false,
     },
     {
       lot_id: "lot-expired",
@@ -56,6 +57,7 @@ const milk: ProductInventory = {
       location_name: "Kitchen",
       quantity: 1,
       expiration_date: "2020-01-01",
+      expired: true,
     },
     {
       lot_id: "lot-undated",
@@ -63,6 +65,7 @@ const milk: ProductInventory = {
       location_name: "Cellar",
       quantity: 2,
       expiration_date: null,
+      expired: false,
     },
   ],
 };
@@ -86,6 +89,7 @@ function renderScreen(inventory: InventoryProductScreenApi = api()) {
       householdId={HOUSEHOLD}
       userId={USER}
       productId="prod-1"
+      today="2026-09-10"
       api={inventory}
     />,
   );
@@ -111,13 +115,19 @@ describe("InventoryProductScreen", () => {
   });
 
   it("renders dated, undated, and expired lots", async () => {
-    renderScreen();
+    const inventory = api();
+    renderScreen(inventory);
 
-    expect(await screen.findByText("2027-01-10")).toBeTruthy();
+    expect(await screen.findByText("2026-09-12")).toBeTruthy();
+    expect(screen.getByText("in 2 days")).toBeTruthy();
     expect(screen.getByText("No expiration")).toBeTruthy();
     expect(screen.getByText("Expired")).toBeTruthy();
+    expect(screen.getByText("2020-01-01")).toBeTruthy();
     expect(screen.getByText("2 at Kitchen")).toBeTruthy();
     expect(screen.getByText("2 at Cellar")).toBeTruthy();
+    expect(inventory.getProductInventory).toHaveBeenCalledWith(HOUSEHOLD, "prod-1", {
+      today: "2026-09-10",
+    });
   });
 
   it("shows a not-found message without the raw error code", async () => {
@@ -200,6 +210,32 @@ describe("InventoryProductScreen", () => {
     expect(screen.queryByRole("dialog", { name: "Add stock" })).toBeNull();
   });
 
+  it("omits expiration_date when Add stock expiration is empty", async () => {
+    const inventory = api();
+    renderScreen(inventory);
+    await screen.findByRole("heading", { name: "Milk" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add stock" }));
+    const addDialog = screen.getByRole("dialog", { name: "Add stock" });
+    fireEvent.change(within(addDialog).getByLabelText("Quantity"), {
+      target: { value: "2" },
+    });
+    fireEvent.submit(within(addDialog).getByRole("button", { name: "Add stock" }).closest("form")!);
+
+    await waitFor(() => {
+      expect(inventory.addInventory).toHaveBeenCalledWith({
+        household_id: HOUSEHOLD,
+        user_id: USER,
+        product_id: "prod-1",
+        location_id: "loc-1",
+        quantity: 2,
+      });
+    });
+    expect(inventory.addInventory).not.toHaveBeenCalledWith(
+      expect.objectContaining({ expiration_date: expect.anything() }),
+    );
+  });
+
   it("keeps the add form open and shows a mapped error on failure", async () => {
     const inventory = api({
       addInventory: vi.fn().mockResolvedValue({ ok: false, code: "invalid_location" }),
@@ -228,7 +264,7 @@ describe("InventoryProductScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     const removeDialog = screen.getByRole("dialog", { name: "Remove" });
     expect(
-      within(removeDialog).getByRole("option", { name: "Kitchen · 2 · 2027-01-10" }),
+      within(removeDialog).getByRole("option", { name: "Kitchen · 2 · 2026-09-12" }),
     ).toBeTruthy();
     expect(
       within(removeDialog).getByRole("option", { name: "Kitchen · 1 · 2020-01-01" }),

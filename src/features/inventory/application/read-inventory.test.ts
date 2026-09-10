@@ -277,6 +277,40 @@ describe("getProductInventory", () => {
       "lot-undated",
     ]);
     expect(result.value.lots[0]?.expiration_date).toBe("2026-09-20");
+    expect(result.value.lots.map((row) => row.expired)).toEqual([false, false, false]);
+  });
+
+  it("marks lots expired using the supplied today", async () => {
+    await seedCatalog();
+    await inventoryRepository.putLot(
+      lot({ id: "lot-expired", quantity: 1, expiration_date: "2026-09-09" }),
+    );
+    await inventoryRepository.putLot(
+      lot({ id: "lot-today", quantity: 1, expiration_date: "2026-09-10" }),
+    );
+    await inventoryRepository.putLot(
+      lot({ id: "lot-later", quantity: 1, expiration_date: "2026-09-20" }),
+    );
+    await inventoryRepository.putLot(
+      lot({ id: "lot-undated", quantity: 1, expiration_date: null }),
+    );
+
+    const result = await getProductInventory(HOUSEHOLD_A, PROD_MILK, {
+      today: "2026-09-10",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(
+      result.value.lots.map((row) => ({ id: row.lot_id, expired: row.expired })),
+    ).toEqual([
+      { id: "lot-expired", expired: true },
+      { id: "lot-today", expired: false },
+      { id: "lot-later", expired: false },
+      { id: "lot-undated", expired: false },
+    ]);
   });
 
   it("returns zero stock for an active product with no lots", async () => {

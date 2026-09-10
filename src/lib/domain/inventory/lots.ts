@@ -7,6 +7,11 @@ export type LotAllocation = {
   quantity: number;
 };
 
+function utcDay(isoDate: string): number {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  return Date.UTC(year, month - 1, day);
+}
+
 function addDays(isoDate: string, days: number): string {
   const [year, month, day] = isoDate.split("-").map(Number);
   const utc = Date.UTC(year, month - 1, day + days);
@@ -15,6 +20,17 @@ function addDays(isoDate: string, days: number): string {
   const m = String(next.getUTCMonth() + 1).padStart(2, "0");
   const d = String(next.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+export function todayIsoDate(now = new Date()): string {
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function calendarDaysUntil(today: string, date: string): number {
+  return (utcDay(date) - utcDay(today)) / 86_400_000;
 }
 
 export function applyLotDelta(

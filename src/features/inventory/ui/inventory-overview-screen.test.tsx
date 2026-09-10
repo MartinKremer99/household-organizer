@@ -195,6 +195,24 @@ describe("InventoryOverviewScreen", () => {
     expect(await screen.findByText("No products match these filters.")).toBeTruthy();
   });
 
+  it("seeds the location filter from initialLocationId", async () => {
+    const inventory = api();
+    render(
+      <InventoryOverviewScreen
+        householdId={HOUSEHOLD}
+        initialLocationId="loc-1"
+        api={inventory}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(inventory.listInventoryOverview).toHaveBeenCalledWith(HOUSEHOLD, {
+        location_id: "loc-1",
+      });
+    });
+    expect(screen.getByLabelText("Location")).toHaveProperty("value", "loc-1");
+  });
+
   it("shows the empty catalog copy when there are no products", async () => {
     const inventory = api({
       listInventoryOverview: vi.fn().mockResolvedValue([]),

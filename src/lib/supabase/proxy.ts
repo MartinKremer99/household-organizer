@@ -37,7 +37,14 @@ export async function updateSession(request: NextRequest) {
   });
 
   const { data } = await supabase.auth.getClaims();
-  const isAuthenticated = Boolean(data?.claims);
+  let isAuthenticated = Boolean(data?.claims);
+  if (isAuthenticated) {
+    const { data: userData, error } = await supabase.auth.getUser();
+    if (error || !userData.user) {
+      await supabase.auth.signOut();
+      isAuthenticated = false;
+    }
+  }
   const pathname = request.nextUrl.pathname;
   const isPublicAuthRoute = pathname === "/login";
 

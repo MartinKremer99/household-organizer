@@ -2,17 +2,19 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { SettingsLink } from "@/components/layout/settings-link";
 import { Button } from "@/components/ui/button";
+import { SyncStatusControl } from "@/features/sync/ui/sync-status-control";
 import { signOut } from "@/lib/supabase/actions";
 import { getOwnHouseholdId } from "@/lib/supabase/household";
 import { createClient } from "@/lib/supabase/server";
+import { getLiveUserId } from "@/lib/supabase/session";
 
 export default async function HouseholdLayout({
   children,
 }: LayoutProps<"/">) {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
+  const userId = await getLiveUserId(supabase.auth);
 
-  if (!data?.claims) {
+  if (!userId) {
     redirect("/login");
   }
 
@@ -23,6 +25,7 @@ export default async function HouseholdLayout({
 
   return (
     <AppShell
+      status={<SyncStatusControl householdId={householdId} />}
       actions={
         <div className="flex items-center gap-2">
           <SettingsLink />

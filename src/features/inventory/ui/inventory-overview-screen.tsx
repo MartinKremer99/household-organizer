@@ -55,9 +55,11 @@ function locationLine(item: InventoryOverviewItem): string {
 
 export function InventoryOverviewScreen({
   householdId,
+  initialLocationId,
   api,
 }: {
   householdId: string;
+  initialLocationId?: string;
   api?: Partial<InventoryOverviewScreenApi>;
 }) {
   const inventory = useMemo(() => ({ ...defaults, ...api }), [api]);
@@ -67,7 +69,7 @@ export function InventoryOverviewScreen({
   const [locations, setLocations] = useState<Location[]>([]);
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [locationId, setLocationId] = useState("");
+  const [locationId, setLocationId] = useState(initialLocationId ?? "");
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

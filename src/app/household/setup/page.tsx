@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { signOut } from "@/lib/supabase/actions";
 import { getOwnHouseholdId } from "@/lib/supabase/household";
 import { createClient } from "@/lib/supabase/server";
+import { getLiveUserId } from "@/lib/supabase/session";
 import { JoinForm } from "./join-form";
 import { SetupForm } from "./setup-form";
 
 export default async function HouseholdSetupPage() {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getClaims();
+  const userId = await getLiveUserId(supabase.auth);
 
-  if (!data?.claims) {
+  if (!userId) {
     redirect("/login");
   }
 
@@ -28,6 +31,11 @@ export default async function HouseholdSetupPage() {
         <h2 className="text-lg font-medium">Join a household</h2>
         <JoinForm />
       </section>
+      <form action={signOut}>
+        <Button type="submit" variant="secondary">
+          Sign out
+        </Button>
+      </form>
     </main>
   );
 }
