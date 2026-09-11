@@ -11,6 +11,7 @@ import {
   type InventoryOverviewItem,
 } from "@/features/inventory/application/read-inventory";
 import { listActiveLocations } from "@/features/locations/application/manage-locations";
+import { ProductBarcodeFields } from "@/features/barcode/ui/product-barcode-fields";
 import { createProduct } from "@/features/products/application/manage-products";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -38,6 +39,7 @@ type CreateEditor = {
   name: string;
   categoryId: string;
   minimumStock: string;
+  barcode: string;
 };
 
 const defaults: InventoryOverviewScreenApi = {
@@ -163,6 +165,7 @@ export function InventoryOverviewScreen({
       name: "",
       categoryId: categories[0]?.id ?? "",
       minimumStock: "0",
+      barcode: "",
     });
   }
 
@@ -179,6 +182,7 @@ export function InventoryOverviewScreen({
       name: editor.name,
       category_id: editor.categoryId,
       minimum_stock: Number(editor.minimumStock),
+      barcode: editor.barcode.trim() === "" ? null : editor.barcode,
     });
 
     if (!result.ok) {
@@ -332,7 +336,9 @@ export function InventoryOverviewScreen({
         open={editor !== null}
         title="Add product"
         titleId="inventory-create-product-title"
-        onClose={() => setEditor(null)}
+        onClose={() => {
+          setEditor(null);
+        }}
       >
         {editor ? (
           <form
@@ -350,6 +356,12 @@ export function InventoryOverviewScreen({
               onChange={(event) =>
                 setEditor({ ...editor, name: event.target.value })
               }
+            />
+            <ProductBarcodeFields
+              barcode={editor.barcode}
+              name={editor.name}
+              onBarcodeChange={(barcode) => setEditor({ ...editor, barcode })}
+              onNameChange={(name) => setEditor({ ...editor, name })}
             />
             <div className="flex flex-col gap-1">
               <label htmlFor="inventory-create-category" className="text-sm font-medium">

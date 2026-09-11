@@ -137,6 +137,53 @@ describe.skipIf(!supabaseUp)("apply_catalog_command", () => {
     ).toBe("t");
   });
 
+  it("stores a barcode, replays the same product, and rejects a household barcode clash", async () => {
+    const token = await signUp(`cat-bar-${Date.now()}@example.test`, "password-123456");
+    await rpc(token, "create_household", { p_name: "Barcode house" });
+    const categoryId = crypto.randomUUID();
+    const category = await rpc(token, "apply_catalog_command", {
+      p_operation_id: crypto.randomUUID(),
+      p_operation_type: "CREATE_CATEGORY",
+      p_payload: { id: categoryId, name: "Barcode drinks" },
+      p_client_created_at: "2026-09-11T08:00:00Z",
+    });
+    expect(category.body).toMatchObject({ ok: true });
+
+    const productId = crypto.randomUUID();
+    const operationId = crypto.randomUUID();
+    const createArgs = {
+      p_operation_id: operationId,
+      p_operation_type: "CREATE_PRODUCT",
+      p_payload: {
+        id: productId,
+        name: "Cola",
+        category_id: categoryId,
+        minimum_stock: 0,
+        barcode: "5449000000996",
+      },
+      p_client_created_at: "2026-09-11T08:00:00Z",
+    };
+    const first = await rpc(token, "apply_catalog_command", createArgs);
+    expect(first.body).toMatchObject({ ok: true, status: "applied" });
+    const retry = await rpc(token, "apply_catalog_command", createArgs);
+    expect(retry.body).toMatchObject({ ok: true, status: "already_applied" });
+
+    const clash = await rpc(token, "apply_catalog_command", {
+      p_operation_id: crypto.randomUUID(),
+      p_operation_type: "CREATE_PRODUCT",
+      p_payload: {
+        id: crypto.randomUUID(),
+        name: "Diet cola",
+        category_id: categoryId,
+        minimum_stock: 0,
+        barcode: "5449000000996",
+      },
+      p_client_created_at: "2026-09-11T08:00:00Z",
+    });
+    expect(clash.body).toMatchObject({ ok: false, code: "duplicate_barcode" });
+    expect(clash.body).not.toMatchObject({ code: "duplicate_name" });
+  });
+
   it("rejects another household's user", async () => {
     const a = await signUp(`cat-a-${Date.now()}@example.test`, "password-123456");
     const b = await signUp(`cat-b-${Date.now()}@example.test`, "password-123456");

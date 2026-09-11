@@ -99,6 +99,7 @@ describe("ProductsScreen", () => {
         name: "Oats",
         category_id: "cat-1",
         minimum_stock: 1,
+        barcode: null,
       });
     });
   });
@@ -204,6 +205,56 @@ describe("ProductsScreen", () => {
     expect(screen.getByRole("button", { name: "Add product" })).toHaveProperty(
       "disabled",
       true,
+    );
+  });
+
+  it("shows a barcode on the product card and only on create", async () => {
+    const cola = { ...milk, id: "prod-2", name: "Cola", barcode: "5449000000996" };
+    const catalog = api({
+      listActiveProducts: vi.fn().mockResolvedValue([cola]),
+      searchActiveProducts: vi.fn().mockResolvedValue([cola]),
+    });
+    render(<ProductsScreen householdId={HOUSEHOLD} api={catalog} />);
+    expect(await screen.findByText("5449000000996")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit Cola" }));
+    expect(screen.queryByLabelText("Barcode")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Scan barcode" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+    expect(screen.getByLabelText("Barcode")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Scan barcode" })).toBeTruthy();
+  });
+
+  it("passes a typed barcode to createProduct and maps duplicate_barcode", async () => {
+    const catalog = api({
+      listActiveProducts: vi.fn().mockResolvedValue([]),
+      createProduct: vi
+        .fn()
+        .mockResolvedValueOnce({ ok: false, code: "duplicate_barcode" }),
+    });
+    render(<ProductsScreen householdId={HOUSEHOLD} api={catalog} />);
+    await screen.findByText("No products yet.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Cola" } });
+    fireEvent.change(screen.getByLabelText("Barcode"), {
+      target: { value: "5449000000996" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: "Save" }).closest("form")!);
+
+    await waitFor(() => {
+      expect(catalog.createProduct).toHaveBeenCalledWith({
+        household_id: HOUSEHOLD,
+        name: "Cola",
+        category_id: "cat-1",
+        minimum_stock: 0,
+        barcode: "5449000000996",
+      });
+    });
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "That barcode is already used.",
     );
   });
 });

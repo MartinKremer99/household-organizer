@@ -7,7 +7,8 @@ export type DomainErrorCode =
   | "invalid_shopping_item"
   | "invalid_put_away"
   | "invalid_name"
-  | "invalid_minimum_stock";
+  | "invalid_minimum_stock"
+  | "invalid_barcode";
 
 export type DomainResult<T> =
   | { ok: true; value: T }

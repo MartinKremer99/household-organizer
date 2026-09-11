@@ -3,6 +3,7 @@ import { productRepository } from "@/features/products/repositories/product-repo
 import { getHouseholdDb } from "@/lib/db";
 import type { Product } from "@/lib/db";
 import { validateCatalogName } from "@/lib/domain/catalog/name";
+import { validateBarcode } from "@/lib/domain/products/barcode";
 import { validateMinimumStock } from "@/lib/domain/products/minimum-stock";
 import { createOperationId } from "@/lib/sync/operation-id";
 import { createPendingOperation, enqueue } from "@/lib/sync/outbox";
@@ -14,6 +15,8 @@ export type ProductErrorCode =
   | "not_found"
   | "invalid_category"
   | "invalid_minimum_stock"
+  | "invalid_barcode"
+  | "duplicate_barcode"
   | "persistence_failure";
 
 export type ProductResult<T> =
@@ -67,12 +70,13 @@ function byName(left: Product, right: Product): number {
   return left.name.toLowerCase().localeCompare(right.name.toLowerCase());
 }
 
-function normalizeBarcode(barcode: string | null | undefined): string | null {
-  if (barcode == null) {
-    return null;
-  }
-  const trimmed = barcode.trim();
-  return trimmed.length === 0 ? null : trimmed;
+async function barcodeTaken(
+  householdId: string,
+  barcode: string,
+  exceptId?: string,
+): Promise<boolean> {
+  const rows = await productRepository.list(householdId, { includeInactive: true });
+  return rows.some((row) => row.id !== exceptId && row.barcode === barcode);
 }
 
 async function nameTaken(
@@ -116,6 +120,11 @@ export async function createProduct(
     return fail("invalid_minimum_stock");
   }
 
+  const barcode = validateBarcode(input.barcode);
+  if (!barcode.ok) {
+    return fail("invalid_barcode");
+  }
+
   const db = getHouseholdDb();
   try {
     return await db.transaction("rw", [db.products, db.categories, db.pending_operations], async () => {
@@ -129,6 +138,9 @@ export async function createProduct(
       if (await nameTaken(input.household_id, name.value)) {
         return fail("duplicate_name");
       }
+      if (barcode.value && (await barcodeTaken(input.household_id, barcode.value))) {
+        return fail("duplicate_barcode");
+      }
 
       const now = new Date().toISOString();
       const record: Product = {
@@ -137,7 +149,7 @@ export async function createProduct(
         name: name.value,
         category_id: input.category_id,
         minimum_stock: minimum.value,
-        barcode: normalizeBarcode(input.barcode),
+        barcode: barcode.value,
         is_active: true,
         created_at: now,
         updated_at: now,

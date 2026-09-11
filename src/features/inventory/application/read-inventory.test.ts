@@ -265,6 +265,7 @@ describe("getProductInventory", () => {
       category_id: CAT_FOOD,
       category_name: "Food",
       minimum_stock: 4,
+      barcode: null,
       total_quantity: 6,
     });
     expect(result.value.locations).toEqual([
@@ -313,6 +314,20 @@ describe("getProductInventory", () => {
     ]);
   });
 
+  it("includes a product barcode when present", async () => {
+    await seedCatalog();
+    await productRepository.put(
+      product({ id: PROD_WATER, name: "Water", barcode: "5449000000996" }),
+    );
+
+    const result = await getProductInventory(HOUSEHOLD_A, PROD_WATER);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.barcode).toBe("5449000000996");
+  });
+
   it("returns zero stock for an active product with no lots", async () => {
     await seedCatalog();
 
@@ -325,6 +340,7 @@ describe("getProductInventory", () => {
         category_id: CAT_FOOD,
         category_name: "Food",
         minimum_stock: 0,
+        barcode: null,
         total_quantity: 0,
         locations: [],
         lots: [],

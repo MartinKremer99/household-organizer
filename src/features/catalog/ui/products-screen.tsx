@@ -11,6 +11,7 @@ import {
   searchActiveProducts,
 } from "@/features/products/application/manage-products";
 import { listActiveCategories } from "@/features/categories/application/manage-categories";
+import { ProductBarcodeFields } from "@/features/barcode/ui/product-barcode-fields";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -48,6 +49,7 @@ type Editor = {
   name: string;
   categoryId: string;
   minimumStock: string;
+  barcode: string;
 };
 
 export function ProductsScreen({
@@ -123,6 +125,7 @@ export function ProductsScreen({
         name: editor.name,
         category_id: editor.categoryId,
         minimum_stock: Number(editor.minimumStock),
+        barcode: editor.barcode.trim() === "" ? null : editor.barcode,
       });
       setPending(false);
       if (!result.ok) {
@@ -234,6 +237,7 @@ export function ProductsScreen({
               name: "",
               categoryId: categories[0]?.id ?? "",
               minimumStock: "0",
+              barcode: "",
             });
           }}
         >
@@ -266,6 +270,7 @@ export function ProductsScreen({
               <Card title={product.name}>
                 <p>{categoryName(product.category_id)}</p>
                 <p>Min {product.minimum_stock}</p>
+                {product.barcode ? <p>{product.barcode}</p> : null}
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Button
                     type="button"
@@ -278,6 +283,7 @@ export function ProductsScreen({
                         name: product.name,
                         categoryId: product.category_id,
                         minimumStock: String(product.minimum_stock),
+                        barcode: product.barcode ?? "",
                       });
                     }}
                   >
@@ -322,6 +328,14 @@ export function ProductsScreen({
                 setEditor({ ...editor, name: event.target.value })
               }
             />
+            {editor.mode === "create" ? (
+              <ProductBarcodeFields
+                barcode={editor.barcode}
+                name={editor.name}
+                onBarcodeChange={(barcode) => setEditor({ ...editor, barcode })}
+                onNameChange={(name) => setEditor({ ...editor, name })}
+              />
+            ) : null}
             <div className="flex flex-col gap-1">
               <label htmlFor="product-category" className="text-sm font-medium">
                 Category

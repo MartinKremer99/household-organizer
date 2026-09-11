@@ -53,6 +53,7 @@ export type ProductInventory = {
   category_id: string;
   category_name: string | null;
   minimum_stock: number;
+  barcode: string | null;
   total_quantity: number;
   locations: InventoryLocationQuantity[];
   lots: InventoryLotView[];
@@ -259,6 +260,7 @@ export async function getProductInventory(
       category_id: product.category_id,
       category_name: categoryNames.get(product.category_id) ?? null,
       minimum_stock: product.minimum_stock,
+      barcode: product.barcode,
       total_quantity: totalQuantity(lots),
       locations: locationQuantities(lots, locationsById),
       lots: lotViews,

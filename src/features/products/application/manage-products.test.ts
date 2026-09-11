@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 import { categoryRepository } from "@/features/categories/repositories/category-repository";
-import { resetHouseholdDbForTests } from "@/lib/db";
+import { getHouseholdDb, resetHouseholdDbForTests } from "@/lib/db";
 import type { Category } from "@/lib/db";
 import {
   archiveProduct,
@@ -63,6 +63,78 @@ describe("manage-products", () => {
     expect(created.value.barcode).toBeNull();
     expect(created.value.category_id).toBe("category-a");
     expect(created.value.minimum_stock).toBe(0);
+  });
+
+  it("persists a barcode and enqueues it on CREATE_PRODUCT", async () => {
+    const created = await createProduct({
+      household_id: HOUSEHOLD_A,
+      name: "Milk",
+      category_id: "category-a",
+      minimum_stock: 0,
+      barcode: " 5449000000996 ",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) {
+      return;
+    }
+    expect(created.value.barcode).toBe("5449000000996");
+    expect(await getHouseholdDb().pending_operations.toArray()).toMatchObject([
+      {
+        operation_type: "CREATE_PRODUCT",
+        payload: {
+          id: created.value.id,
+          name: "Milk",
+          barcode: "5449000000996",
+        },
+      },
+    ]);
+  });
+
+  it("rejects an invalid barcode and a household duplicate including archived products", async () => {
+    expect(
+      await createProduct({
+        household_id: HOUSEHOLD_A,
+        name: "Milk",
+        category_id: "category-a",
+        minimum_stock: 0,
+        barcode: "abc",
+      }),
+    ).toEqual({ ok: false, code: "invalid_barcode" });
+
+    const first = await createProduct({
+      household_id: HOUSEHOLD_A,
+      name: "Cola",
+      category_id: "category-a",
+      minimum_stock: 0,
+      barcode: "5449000000996",
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+    await archiveProduct({
+      household_id: HOUSEHOLD_A,
+      product_id: first.value.id,
+    });
+
+    expect(
+      await createProduct({
+        household_id: HOUSEHOLD_A,
+        name: "Diet cola",
+        category_id: "category-a",
+        minimum_stock: 0,
+        barcode: "5449000000996",
+      }),
+    ).toEqual({ ok: false, code: "duplicate_barcode" });
+
+    const other = await createProduct({
+      household_id: HOUSEHOLD_B,
+      name: "Cola",
+      category_id: "category-other",
+      minimum_stock: 0,
+      barcode: "5449000000996",
+    });
+    expect(other.ok).toBe(true);
   });
 
   it("rejects an empty name", async () => {

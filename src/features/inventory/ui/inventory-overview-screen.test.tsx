@@ -312,6 +312,7 @@ describe("InventoryOverviewScreen", () => {
         name: "Oats",
         category_id: "cat-1",
         minimum_stock: 0,
+        barcode: null,
       });
     });
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -341,5 +342,51 @@ describe("InventoryOverviewScreen", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("That name is already used.");
     expect(screen.getByRole("dialog", { name: "Add product" })).toBeTruthy();
     expect(onProductCreated).not.toHaveBeenCalled();
+  });
+
+  it("passes a typed barcode to createProduct", async () => {
+    const inventory = api();
+    render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
+    await screen.findByRole("heading", { name: "Milk" });
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    const dialog = within(screen.getByRole("dialog", { name: "Add product" }));
+    expect(dialog.getByLabelText("Barcode")).toBeTruthy();
+    expect(dialog.getByRole("button", { name: "Scan barcode" })).toBeTruthy();
+    fireEvent.change(dialog.getByLabelText("Name"), { target: { value: "Oats" } });
+    fireEvent.change(dialog.getByLabelText("Barcode"), {
+      target: { value: "5449000000996" },
+    });
+    fireEvent.submit(dialog.getByRole("button", { name: "Save" }).closest("form")!);
+
+    await waitFor(() => {
+      expect(inventory.createProduct).toHaveBeenCalledWith({
+        household_id: HOUSEHOLD,
+        name: "Oats",
+        category_id: "cat-1",
+        minimum_stock: 0,
+        barcode: "5449000000996",
+      });
+    });
+  });
+
+  it("maps a duplicate barcode error", async () => {
+    const inventory = api({
+      createProduct: vi.fn().mockResolvedValue({ ok: false, code: "duplicate_barcode" }),
+    });
+    render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
+    await screen.findByRole("heading", { name: "Milk" });
+    fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+
+    const dialog = within(screen.getByRole("dialog", { name: "Add product" }));
+    fireEvent.change(dialog.getByLabelText("Name"), { target: { value: "Oats" } });
+    fireEvent.change(dialog.getByLabelText("Barcode"), {
+      target: { value: "5449000000996" },
+    });
+    fireEvent.submit(dialog.getByRole("button", { name: "Save" }).closest("form")!);
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "That barcode is already used.",
+    );
   });
 });

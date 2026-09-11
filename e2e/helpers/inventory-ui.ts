@@ -3,7 +3,7 @@ import { expect, type Page } from "@playwright/test";
 export async function createProductFromInventory(
   page: Page,
   name: string,
-  options?: { minimumStock?: number },
+  options?: { minimumStock?: number; barcode?: string },
 ): Promise<void> {
   await page.getByRole("link", { name: "Inventory", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
@@ -13,6 +13,9 @@ export async function createProductFromInventory(
   await dialog.getByLabel("Name").fill(name);
   if (options?.minimumStock != null) {
     await dialog.getByLabel("Minimum stock").fill(String(options.minimumStock));
+  }
+  if (options?.barcode != null) {
+    await dialog.getByLabel("Barcode").fill(options.barcode);
   }
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name, exact: true, level: 1 })).toBeVisible();

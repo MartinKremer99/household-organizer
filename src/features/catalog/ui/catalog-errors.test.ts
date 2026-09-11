@@ -16,6 +16,12 @@ describe("catalogErrorMessage", () => {
     expect(catalogErrorMessage("invalid_minimum_stock")).toBe(
       "Minimum stock must be a whole number of 0 or more.",
     );
+    expect(catalogErrorMessage("invalid_barcode")).toBe(
+      "Enter a barcode using 6 to 14 digits, or leave it blank.",
+    );
+    expect(catalogErrorMessage("duplicate_barcode")).toBe(
+      "That barcode is already used.",
+    );
     expect(catalogErrorMessage("not_found")).toBe(
       "That item is no longer available.",
     );

@@ -37,6 +37,7 @@ const milk: ProductInventory = {
   category_id: "cat-1",
   category_name: "Food",
   minimum_stock: 4,
+  barcode: null,
   total_quantity: 5,
   locations: [
     { location_id: "loc-1", location_name: "Kitchen", quantity: 3 },
@@ -107,11 +108,26 @@ describe("InventoryProductScreen", () => {
     expect(screen.getByText("Food")).toBeTruthy();
     expect(screen.getByText("Total: 5")).toBeTruthy();
     expect(screen.getByText("Min 4")).toBeTruthy();
+    expect(screen.queryByText("5449000000996")).toBeNull();
     expect(screen.getByText("Kitchen: 3")).toBeTruthy();
     expect(screen.getByText("Cellar: 2")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Back to inventory" }).getAttribute("href")).toBe(
       "/inventory",
     );
+  });
+
+  it("shows a read-only barcode next to minimum stock", async () => {
+    renderScreen(
+      api({
+        getProductInventory: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { ...milk, barcode: "5449000000996" },
+        }),
+      }),
+    );
+
+    expect(await screen.findByText("Min 4")).toBeTruthy();
+    expect(screen.getByText("5449000000996")).toBeTruthy();
   });
 
   it("renders dated, undated, and expired lots", async () => {

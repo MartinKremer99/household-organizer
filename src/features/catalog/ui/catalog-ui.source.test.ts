@@ -22,5 +22,7 @@ describe("catalog UI source", () => {
     expect(sources).not.toMatch(/outbox/);
     expect(sources).not.toMatch(/uploader/);
     expect(sources).not.toMatch(/syncHousehold/);
+    expect(sources).not.toMatch(/getUserMedia/);
+    expect(sources).not.toMatch(/BarcodeDetector/);
   });
 });

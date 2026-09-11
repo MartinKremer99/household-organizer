@@ -363,6 +363,7 @@ export function InventoryProductScreen({
           {product.minimum_stock > 0 ? (
             <p className="text-sm">Min {product.minimum_stock}</p>
           ) : null}
+          {product.barcode ? <p className="text-sm">{product.barcode}</p> : null}
           {isLowStock(product.total_quantity, product.minimum_stock) ? (
             <p className="text-sm">Low stock</p>
           ) : null}
