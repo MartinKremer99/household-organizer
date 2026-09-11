@@ -15,6 +15,7 @@ import { ProductBarcodeFields } from "@/features/barcode/ui/product-barcode-fiel
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import { catalogErrorMessage } from "./catalog-errors";
 
@@ -336,25 +337,20 @@ export function ProductsScreen({
                 onNameChange={(name) => setEditor({ ...editor, name })}
               />
             ) : null}
-            <div className="flex flex-col gap-1">
-              <label htmlFor="product-category" className="text-sm font-medium">
-                Category
-              </label>
-              <select
-                id="product-category"
-                className="min-h-11 rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-                value={editor.categoryId}
-                onChange={(event) =>
-                  setEditor({ ...editor, categoryId: event.target.value })
-                }
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              id="product-category"
+              label="Category"
+              value={editor.categoryId}
+              onChange={(event) =>
+                setEditor({ ...editor, categoryId: event.target.value })
+              }
+            >
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </Select>
             <TextField
               id="product-minimum-stock"
               label="Minimum stock"

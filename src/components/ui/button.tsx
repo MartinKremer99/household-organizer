@@ -5,12 +5,9 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const VARIANT_CLASS = {
-  primary:
-    "bg-foreground text-background disabled:opacity-60",
-  secondary:
-    "border border-foreground/20 bg-background text-foreground disabled:opacity-60",
-  danger:
-    "border border-foreground bg-background font-semibold text-foreground underline disabled:opacity-60",
+  primary: "bg-primary text-primary-foreground",
+  secondary: "border border-border bg-surface text-foreground",
+  danger: "border border-danger bg-surface font-semibold text-danger",
 } as const;
 
 export function Button({
@@ -22,7 +19,7 @@ export function Button({
   return (
     <button
       type={type}
-      className={`inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${VARIANT_CLASS[variant]} ${className}`.trim()}
+      className={`inline-flex min-h-11 items-center justify-center rounded-control px-3 py-2 text-body font-medium touch-manipulation focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-60 ${VARIANT_CLASS[variant]} ${className}`.trim()}
       {...props}
     />
   );

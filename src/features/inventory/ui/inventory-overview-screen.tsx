@@ -16,6 +16,7 @@ import { createProduct } from "@/features/products/application/manage-products";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import { isLowStock } from "@/lib/domain/products/low-stock";
 
@@ -48,9 +49,6 @@ const defaults: InventoryOverviewScreenApi = {
   listActiveLocations,
   createProduct,
 };
-
-const SELECT_CLASS =
-  "min-h-11 rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 
 function buildFilters(
   query: string,
@@ -229,42 +227,32 @@ export function InventoryOverviewScreen({
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="inventory-category" className="text-sm font-medium">
-            Category
-          </label>
-          <select
-            id="inventory-category"
-            className={SELECT_CLASS}
-            value={categoryId}
-            onChange={(event) => setCategoryId(event.target.value)}
-          >
-            <option value="">All categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor="inventory-location" className="text-sm font-medium">
-            Location
-          </label>
-          <select
-            id="inventory-location"
-            className={SELECT_CLASS}
-            value={locationId}
-            onChange={(event) => setLocationId(event.target.value)}
-          >
-            <option value="">All locations</option>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          id="inventory-category"
+          label="Category"
+          value={categoryId}
+          onChange={(event) => setCategoryId(event.target.value)}
+        >
+          <option value="">All categories</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          id="inventory-location"
+          label="Location"
+          value={locationId}
+          onChange={(event) => setLocationId(event.target.value)}
+        >
+          <option value="">All locations</option>
+          {locations.map((location) => (
+            <option key={location.id} value={location.id}>
+              {location.name}
+            </option>
+          ))}
+        </Select>
       </div>
 
       {filtersActive ? (
@@ -363,26 +351,21 @@ export function InventoryOverviewScreen({
               onBarcodeChange={(barcode) => setEditor({ ...editor, barcode })}
               onNameChange={(name) => setEditor({ ...editor, name })}
             />
-            <div className="flex flex-col gap-1">
-              <label htmlFor="inventory-create-category" className="text-sm font-medium">
-                Category
-              </label>
-              <select
-                id="inventory-create-category"
-                className={SELECT_CLASS}
-                required={!noCategories}
-                value={editor.categoryId}
-                onChange={(event) =>
-                  setEditor({ ...editor, categoryId: event.target.value })
-                }
-              >
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              id="inventory-create-category"
+              label="Category"
+              required={!noCategories}
+              value={editor.categoryId}
+              onChange={(event) =>
+                setEditor({ ...editor, categoryId: event.target.value })
+              }
+            >
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </Select>
             <TextField
               id="inventory-create-minimum-stock"
               label="Minimum stock"

@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import { todayIsoDate } from "@/lib/domain/inventory/lots";
 import { isLowStock } from "@/lib/domain/products/low-stock";
@@ -40,9 +41,6 @@ const defaults: InventoryProductScreenApi = {
   removeInventory,
   moveInventory,
 };
-
-const SELECT_CLASS =
-  "min-h-11 rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 
 function parsePositiveInteger(raw: string): number | null {
   const trimmed = raw.trim();
@@ -443,23 +441,18 @@ export function InventoryProductScreen({
             value={addQuantity}
             onChange={(event) => setAddQuantity(event.target.value)}
           />
-          <div className="flex flex-col gap-1">
-            <label htmlFor="add-location" className="text-sm font-medium">
-              Location
-            </label>
-            <select
-              id="add-location"
-              className={SELECT_CLASS}
-              value={addLocationId}
-              onChange={(event) => setAddLocationId(event.target.value)}
-            >
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            id="add-location"
+            label="Location"
+            value={addLocationId}
+            onChange={(event) => setAddLocationId(event.target.value)}
+          >
+            {locations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.name}
+              </option>
+            ))}
+          </Select>
           <TextField
             id="add-expiration"
             label="Expiration date"
@@ -514,44 +507,34 @@ export function InventoryProductScreen({
               {removeMax} available at {removeLocationName}
             </p>
           )}
-          <div className="flex flex-col gap-1">
-            <label htmlFor="remove-location" className="text-sm font-medium">
-              Location
-            </label>
-            <select
-              id="remove-location"
-              className={SELECT_CLASS}
-              value={removeLocationId}
-              onChange={(event) => {
-                setRemoveLocationId(event.target.value);
-                setRemoveLotId("");
-              }}
-            >
-              {stockedLocations.map((row) => (
-                <option key={row.location_id} value={row.location_id}>
-                  {row.location_name ?? "Unknown location"}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="remove-lot" className="text-sm font-medium">
-              Lot
-            </label>
-            <select
-              id="remove-lot"
-              className={SELECT_CLASS}
-              value={removeLotId}
-              onChange={(event) => setRemoveLotId(event.target.value)}
-            >
-              <option value="">Any lot (oldest first)</option>
-              {lotsAtRemoveLocation.map((lot) => (
-                <option key={lot.lot_id} value={lot.lot_id}>
-                  {lotLabel(lot)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            id="remove-location"
+            label="Location"
+            value={removeLocationId}
+            onChange={(event) => {
+              setRemoveLocationId(event.target.value);
+              setRemoveLotId("");
+            }}
+          >
+            {stockedLocations.map((row) => (
+              <option key={row.location_id} value={row.location_id}>
+                {row.location_name ?? "Unknown location"}
+              </option>
+            ))}
+          </Select>
+          <Select
+            id="remove-lot"
+            label="Lot"
+            value={removeLotId}
+            onChange={(event) => setRemoveLotId(event.target.value)}
+          >
+            <option value="">Any lot (oldest first)</option>
+            {lotsAtRemoveLocation.map((lot) => (
+              <option key={lot.lot_id} value={lot.lot_id}>
+                {lotLabel(lot)}
+              </option>
+            ))}
+          </Select>
           {formError && dialog === "remove" ? (
             <p role="alert" className="text-sm">
               {formError}
@@ -603,46 +586,36 @@ export function InventoryProductScreen({
               <p>{lot.expiration_date ?? "No expiration"}</p>
             </div>
           ))}
-          <div className="flex flex-col gap-1">
-            <label htmlFor="move-source" className="text-sm font-medium">
-              Source
-            </label>
-            <select
-              id="move-source"
-              className={SELECT_CLASS}
-              value={moveSourceId}
-              onChange={(event) => {
-                const nextSource = event.target.value;
-                setMoveSourceId(nextSource);
-                if (moveDestId === nextSource) {
-                  setMoveDestId(firstOtherLocation(locations, nextSource));
-                }
-              }}
-            >
-              {stockedLocations.map((row) => (
-                <option key={row.location_id} value={row.location_id}>
-                  {row.location_name ?? "Unknown location"}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor="move-destination" className="text-sm font-medium">
-              Destination
-            </label>
-            <select
-              id="move-destination"
-              className={SELECT_CLASS}
-              value={moveDestId}
-              onChange={(event) => setMoveDestId(event.target.value)}
-            >
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            id="move-source"
+            label="Source"
+            value={moveSourceId}
+            onChange={(event) => {
+              const nextSource = event.target.value;
+              setMoveSourceId(nextSource);
+              if (moveDestId === nextSource) {
+                setMoveDestId(firstOtherLocation(locations, nextSource));
+              }
+            }}
+          >
+            {stockedLocations.map((row) => (
+              <option key={row.location_id} value={row.location_id}>
+                {row.location_name ?? "Unknown location"}
+              </option>
+            ))}
+          </Select>
+          <Select
+            id="move-destination"
+            label="Destination"
+            value={moveDestId}
+            onChange={(event) => setMoveDestId(event.target.value)}
+          >
+            {locations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.name}
+              </option>
+            ))}
+          </Select>
           {sameMoveLocation || (formError && dialog === "move") ? (
             <p role="alert" className="text-sm">
               {formError ?? inventoryErrorMessage("invalid_move")}

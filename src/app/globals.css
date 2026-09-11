@@ -1,26 +1,70 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f4f1ea;
+  --surface: #fffcf7;
+  --surface-elevated: #ffffff;
+  --primary: #243126;
+  --primary-foreground: #f7f4ee;
+  --secondary: #e8e3d6;
+  --muted: #efebe2;
+  --border: #d4cfc3;
+  --foreground: #1c1b16;
+  --muted-foreground: #6a6558;
+  --success: #2f6b4f;
+  --warning: #9a6b1c;
+  --danger: #9b2c2c;
+  --info: #3a5566;
+  --control-radius: 6px;
+  --card-radius: 8px;
+  --sheet-radius: 12px;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-control: var(--control-radius);
+  --radius-card: var(--card-radius);
+  --radius-sheet: var(--sheet-radius);
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-section: 1rem;
+  --text-section--line-height: 1.5rem;
+  --text-card: 0.9375rem;
+  --text-card--line-height: 1.375rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.375rem;
+  --text-secondary: 0.8125rem;
+  --text-secondary--line-height: 1.125rem;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.125rem;
+  --text-numeric: 1.25rem;
+  --text-numeric--line-height: 1.75rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { Button } from "@/components/ui/button";
+import { TextField } from "@/components/ui/text-field";
 import { createHousehold, type AuthFormState } from "@/lib/supabase/actions";
 
 const initialState: AuthFormState = {};
@@ -13,32 +15,23 @@ export function SetupForm() {
 
   return (
     <form action={formAction} className="flex w-full max-w-sm flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="name" className="text-sm font-medium">
-          Household name
-        </label>
-        <input
-          id="name"
-          name="name"
-          type="text"
-          autoComplete="organization"
-          required
-          maxLength={80}
-          className="rounded-md border border-foreground/20 bg-background px-3 py-2"
-        />
-      </div>
+      <TextField
+        id="name"
+        name="name"
+        label="Household name"
+        type="text"
+        autoComplete="organization"
+        required
+        maxLength={80}
+      />
       {state.error ? (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+        <p role="alert" className="text-body text-danger">
           {state.error}
         </p>
       ) : null}
-      <button
-        type="submit"
-        disabled={isPending}
-        className="rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background disabled:opacity-60"
-      >
+      <Button type="submit" disabled={isPending}>
         {isPending ? "Creating…" : "Create household"}
-      </button>
+      </Button>
     </form>
   );
 }

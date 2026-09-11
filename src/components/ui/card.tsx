@@ -1,15 +1,20 @@
 import type { ReactNode } from "react";
 
+export type CardTitleAs = "h2" | "p";
+
 export type CardProps = {
   title: string;
+  titleAs?: CardTitleAs;
   children: ReactNode;
 };
 
-export function Card({ title, children }: CardProps) {
+export function Card({ title, titleAs = "h2", children }: CardProps) {
+  const Title = titleAs;
+
   return (
-    <section className="rounded-md border border-foreground/20 p-3">
-      <h2 className="break-words text-sm font-semibold tracking-tight">{title}</h2>
-      <div className="mt-2 text-sm text-foreground/80">{children}</div>
+    <section className="rounded-card border border-border bg-surface p-3">
+      <Title className="break-words text-card font-medium tracking-tight">{title}</Title>
+      <div className="mt-2 text-body text-muted-foreground">{children}</div>
     </section>
   );
 }

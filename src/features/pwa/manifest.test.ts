@@ -32,5 +32,6 @@ describe("web app manifest", () => {
     expect(viewport.width).toBe("device-width");
     expect(viewport.initialScale).toBe(1);
     expect(viewport.viewportFit).toBe("cover");
+    expect(viewport.themeColor).toBe("#F4F1EA");
   });
 });

@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
+import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import { shoppingErrorMessage } from "./shopping-errors";
 
@@ -64,9 +65,6 @@ const defaults: ShoppingOverviewScreenApi = {
   listActiveProducts,
   listActiveLocations,
 };
-
-const SELECT_CLASS =
-  "min-h-11 rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 
 function parsePositiveInteger(raw: string): number | null {
   const trimmed = raw.trim();
@@ -529,24 +527,19 @@ export function ShoppingOverviewScreen({
             </Button>
           </div>
           {addMode === "product" ? (
-            <div className="flex flex-col gap-1">
-              <label htmlFor="shopping-add-product" className="text-sm font-medium">
-                Product
-              </label>
-              <select
-                id="shopping-add-product"
-                className={SELECT_CLASS}
-                value={addProductId}
-                onChange={(event) => setAddProductId(event.target.value)}
-              >
-                <option value="">Choose a product</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              id="shopping-add-product"
+              label="Product"
+              value={addProductId}
+              onChange={(event) => setAddProductId(event.target.value)}
+            >
+              <option value="">Choose a product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </Select>
           ) : (
             <TextField
               id="shopping-add-text"
@@ -601,23 +594,18 @@ export function ShoppingOverviewScreen({
             value={putAwayQuantity}
             onChange={(event) => setPutAwayQuantity(event.target.value)}
           />
-          <div className="flex flex-col gap-1">
-            <label htmlFor="shopping-put-away-location" className="text-sm font-medium">
-              Location
-            </label>
-            <select
-              id="shopping-put-away-location"
-              className={SELECT_CLASS}
-              value={putAwayLocationId}
-              onChange={(event) => setPutAwayLocationId(event.target.value)}
-            >
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            id="shopping-put-away-location"
+            label="Location"
+            value={putAwayLocationId}
+            onChange={(event) => setPutAwayLocationId(event.target.value)}
+          >
+            {locations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.name}
+              </option>
+            ))}
+          </Select>
           <TextField
             id="shopping-put-away-expiration"
             label="Expiration date"
