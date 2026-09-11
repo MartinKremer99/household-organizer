@@ -15,6 +15,11 @@ import {
   removeStock,
 } from "../helpers/inventory-ui";
 import { startRequestLog } from "../helpers/network";
+import {
+  expectHouseholdName,
+  openSettings,
+  renameHouseholdFromSettings,
+} from "../helpers/settings-ui";
 import { expectSynced } from "../helpers/sync-ui";
 import { skipIfNoLocalSupabase } from "../helpers/require-local";
 import {
@@ -113,6 +118,45 @@ test("offline mutations upload only after Sync now and appear for the joiner", a
     await signInAndJoinHousehold(b.page, "off-sync-b", created.joinCode);
     await b.page.getByRole("link", { name: "Inventory" }).click();
     await expect(b.page.getByText("5 in stock")).toBeVisible();
+  } finally {
+    await a.context.close();
+    await b.context.close();
+  }
+});
+
+test("offline household rename appears for the joiner after Sync now", async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  const a = await openUserContext(browser);
+  const b = await openUserContext(browser);
+  const log = startRequestLog(a.page);
+
+  try {
+    const created = await signInAndCreateHousehold(a.page, "off-ren");
+    await openSettings(a.page);
+    await a.page.getByRole("button", { name: "Sync now" }).click();
+    await expectSynced(a.page);
+
+    log.clear();
+    await a.context.setOffline(true);
+    await expect(a.page.getByText("Offline", { exact: true })).toBeVisible();
+
+    const renamed = `Offline rename ${Date.now().toString(36)}`;
+    await renameHouseholdFromSettings(a.page, renamed);
+    await expectHouseholdName(a.page, renamed);
+    expect(log.supabaseHits()).toEqual([]);
+
+    await a.context.setOffline(false);
+    await expect(a.page.getByText("Back online", { exact: true })).toBeVisible();
+    expect(log.rpcHits("apply_household_command")).toEqual([]);
+
+    await a.page.getByRole("button", { name: "Sync now" }).click();
+    await expectSynced(a.page);
+
+    await signInAndJoinHousehold(b.page, "off-ren-b", created.joinCode);
+    await openSettings(b.page);
+    await expectHouseholdName(b.page, renamed);
   } finally {
     await a.context.close();
     await b.context.close();

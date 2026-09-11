@@ -15,7 +15,11 @@ test("manifest and service worker are available without signing in", async ({ re
 
   const sw = await request.get("/sw.js");
   expect(sw.ok()).toBe(true);
-  expect(await sw.text()).toContain("household-shell-v1");
+  const source = await sw.text();
+  expect(source).toContain("household-shell-v2");
+  const navigate =
+    source.match(/async function networkFirstNavigate[\s\S]*?self\.addEventListener/)?.[0] ?? "";
+  expect(navigate).not.toMatch(/cache\.put/);
 });
 
 test("signed-in PWA chrome stays up offline and does not auto-sync", async ({ browser }) => {

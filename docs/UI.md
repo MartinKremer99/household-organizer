@@ -888,7 +888,7 @@ Account
 V1 household settings:
 
 ```text
-Household name
+Household name (rename)
 Join code
 ```
 
@@ -901,9 +901,10 @@ No member-management UI is required.
 Required:
 
 ```text
-Login
-Sign up
+/login
 ```
+
+There is no public signup UI. Production Auth should use invite-only or disabled public signup.
 
 After login:
 
@@ -1149,23 +1150,9 @@ The notification feature must not be required for core inventory functionality.
 
 ---
 
-# 33. Barcode UI preparation
+# 33. Barcode UI
 
-Barcode scanning is not part of the initial implementation.
-
-When added later:
-
-```text
-+ Add item
-    ↓
-Scan barcode
-    ↓
-Product found?
- ┌──┴──┐
-Yes    No
- │      │
-Use    Create product
-```
+Barcode fields appear on create only (Add product). Users can type a barcode or open Scan barcode. Existing products show the barcode as read-only.
 
 Manual product entry must remain available.
 
@@ -1197,8 +1184,7 @@ Do not design only the happy path.
 The minimum screen set is:
 
 ```text
-/auth/login
-/auth/signup
+/login
 
 /
   Home

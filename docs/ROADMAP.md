@@ -1122,6 +1122,8 @@ Optionally enrich an unknown barcode using an external product database.
 
 # 18. Phase 13 — Quality + production hardening
 
+User-ticket CURSOR-043 is this hardening pass (roadmap tickets 050–055).
+
 ## CURSOR-050 — Automated test coverage
 
 ### Objective

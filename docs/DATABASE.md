@@ -74,7 +74,7 @@ This allows:
 - search for known products
 - adding an existing product to shopping
 - remembering category/default information
-- future barcode association
+- optional barcode lookup at create time
 
 Example:
 
@@ -240,13 +240,14 @@ Reusable product definitions.
 - Quantity is integer-only.
 - No units are required in V1.
 - `minimum_stock = 0` means low-stock automation is disabled for that product.
-- Barcode is optional and primarily prepares the model for a later barcode feature.
+- Barcode is optional. When present, it is unique per household (partial unique index `products_household_id_barcode_key` on `(household_id, barcode)` where barcode is not null).
 - Product names should be unique within a household, case-insensitively, unless a later requirement proves otherwise.
 
 Recommended unique constraint:
 
 ```text
 (household_id, lower(name))
+(household_id, barcode) WHERE barcode IS NOT NULL
 ```
 
 ---
@@ -560,6 +561,7 @@ Recommended:
 products:
   (household_id, is_active)
   (household_id, category_id)
+  UNIQUE (household_id, barcode) WHERE barcode IS NOT NULL
 
 locations:
   (household_id, is_active)

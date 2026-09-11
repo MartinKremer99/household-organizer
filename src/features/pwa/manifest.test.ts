@@ -31,5 +31,6 @@ describe("web app manifest", () => {
     const { viewport } = await import("@/app/layout");
     expect(viewport.width).toBe("device-width");
     expect(viewport.initialScale).toBe(1);
+    expect(viewport.viewportFit).toBe("cover");
   });
 });

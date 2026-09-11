@@ -51,6 +51,18 @@ test("typed barcode creates a product and syncs to another member", async ({
     });
     await expect(a.page.getByText("5449000000996")).toBeVisible();
 
+    await a.page.getByRole("link", { name: "Inventory", exact: true }).click();
+    await expect(a.page.getByRole("heading", { name: "Inventory" })).toBeVisible();
+    await a.page.getByRole("button", { name: "Add product" }).click();
+    const duplicateDialog = a.page.getByRole("dialog", { name: "Add product" });
+    await expect(duplicateDialog).toBeVisible();
+    await duplicateDialog.getByLabel("Name").fill("Cola two");
+    await duplicateDialog.getByLabel("Barcode").fill("5449000000996");
+    await duplicateDialog.getByRole("button", { name: "Save" }).click();
+    await expect(duplicateDialog.getByRole("alert")).toHaveText("That barcode is already used.");
+    await expect(duplicateDialog).toBeVisible();
+    await duplicateDialog.getByRole("button", { name: "Cancel" }).click();
+
     await a.page.getByRole("button", { name: "Sync now" }).click();
     await expectSynced(a.page);
 

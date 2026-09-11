@@ -1,4 +1,4 @@
-const CACHE = "household-shell-v1";
+const CACHE = "household-shell-v2";
 
 function isBypass(url) {
   if (url.hostname.endsWith("supabase.co") || url.hostname.endsWith("supabase.in")) {
@@ -53,20 +53,7 @@ async function cacheFirst(request) {
 }
 
 async function networkFirstNavigate(request) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(CACHE);
-      await cache.put(request, response.clone());
-    }
-    return response;
-  } catch (error) {
-    const cached = await caches.match(request);
-    if (cached) {
-      return cached;
-    }
-    throw error;
-  }
+  return fetch(request);
 }
 
 self.addEventListener("install", () => {

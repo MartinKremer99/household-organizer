@@ -22,6 +22,15 @@ describe("service worker source", () => {
     expect(proxy).toContain(String.raw`manifest\\.webmanifest`);
   });
 
+  it("does not cache document navigations", () => {
+    expect(source).toContain("household-shell-v2");
+    const start = source.indexOf("async function networkFirstNavigate");
+    const end = source.indexOf("self.addEventListener(\"install\"");
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(source.slice(start, end)).not.toMatch(/cache\.put/);
+  });
+
   it("does not register background sync, push, or timers", () => {
     expect(source).not.toMatch(/periodicsync/);
     expect(source).not.toMatch(/addEventListener\(\s*["']push["']/);

@@ -494,17 +494,9 @@ Each user remains individually authenticated.
 
 # 15. Notifications
 
-Notifications are a V1 platform feature, but they should remain lightweight.
+Notifications are opt-in local browser notifications. There is no remote push.
 
-Potential notifications:
-
-```text
-Low stock
-Expiration approaching
-Purchased items waiting to be stored
-```
-
-Users should be able to control notification categories.
+Users can enable Low stock and Expiration after granting browser permission. Purchased-waiting notifications are not implemented.
 
 Notifications must not be required for core functionality.
 
@@ -519,7 +511,7 @@ Goals:
 - launch like a mobile application
 - support offline core workflows
 - provide appropriate icons and manifest
-- support push notifications where supported
+- do not cache household HTML in the service worker
 
 The PWA is a delivery mechanism.
 
@@ -527,25 +519,9 @@ IndexedDB/Dexie remains responsible for local household data.
 
 ---
 
-# 17. Future barcode feature
+# 17. Barcode
 
-Barcode scanning is planned but not required for the initial inventory implementation.
-
-Future flow:
-
-```text
-Scan barcode
-    ↓
-Product found?
- ┌──┴──┐
-Yes    No
- │      │
-Use    Create product
-```
-
-External product database enrichment may be added later.
-
-Manual entry must always remain available.
+Barcode is optional at product create time. Users can type digits or scan with the device camera, then look up a name on Open Food Facts while online. Manual entry always remains available. Existing products show a read-only barcode; editing is not in V1.
 
 ---
 

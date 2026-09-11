@@ -12,7 +12,7 @@ export function SettingsLink() {
     <Link
       href="/settings"
       aria-current={current ? "page" : undefined}
-      className={`text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
+      className={`inline-flex min-h-11 items-center text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground ${
         current ? "underline" : ""
       }`}
     >

@@ -556,6 +556,10 @@ export function InventoryProductScreen({
             <p role="alert" className="text-sm">
               {formError}
             </p>
+          ) : removeQuantityValue != null && removeQuantityValue > removeMax ? (
+            <p role="alert" className="text-sm">
+              {inventoryErrorMessage("insufficient_stock")}
+            </p>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="danger" disabled={pending || removeBlocked}>

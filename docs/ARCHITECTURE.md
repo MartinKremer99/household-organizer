@@ -870,7 +870,7 @@ Desktop can use a different layout if it improves usability, while retaining the
 
 # 28. PWA architecture
 
-The application should eventually be installable as a PWA.
+The application is installable as a PWA.
 
 PWA responsibilities:
 
@@ -878,8 +878,8 @@ PWA responsibilities:
 - icons
 - standalone display
 - service worker
-- asset caching
-- appropriate offline behavior
+- cache-first static assets (`/_next/static/`, `/icons/`)
+- network-only document navigation (household HTML is not cached)
 
 The PWA layer should complement Dexie.
 
@@ -887,50 +887,28 @@ It should not be treated as the application's database.
 
 Dexie stores household data.
 
-The service worker primarily handles application assets/network behavior.
+The service worker does not cache household HTML and does not talk to Supabase.
 
 ---
 
 # 29. Notifications
 
-Notifications are a later platform feature.
+Local opt-in browser notifications exist for low stock and expiration. There is no server push.
 
-Potential notifications:
-
-```text
-low stock
-expiration approaching
-purchased stock waiting to be stored
-```
-
-Notification generation should be server-side or scheduled rather than relying exclusively on a browser tab being open.
-
-Push registration is separate from the core inventory sync system.
+Notification evaluation runs in the open tab after an explicit Sync now. Defaults stay off. Permission is requested only after the user enables notifications.
 
 ---
 
 # 30. Barcode scanning
 
-Barcode support is a later feature.
-
-Architecture preparation:
+Barcode is optional at product create time.
 
 ```text
-products.barcode
-```
-
-is sufficient initially.
-
-Later:
-
-```text
-camera
+camera or typed digits
  ↓
-barcode
+Open Food Facts lookup (online only)
  ↓
-product lookup
- ↓
-existing product or product creation
+prefill name, then create product
 ```
 
 External product database calls should remain outside the core inventory domain.

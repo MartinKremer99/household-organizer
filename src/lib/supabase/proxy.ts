@@ -13,7 +13,12 @@ export async function updateSession(request: NextRequest) {
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !publishableKey) {
-    return NextResponse.next({ request });
+    if (request.nextUrl.pathname === "/login") {
+      return NextResponse.next({ request });
+    }
+    const login = request.nextUrl.clone();
+    login.pathname = "/login";
+    return NextResponse.redirect(login);
   }
 
   let supabaseResponse = NextResponse.next({ request });

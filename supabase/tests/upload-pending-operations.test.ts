@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 
-import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { detectLocalSupabase } from "./local";
 import { beforeEach, describe, expect, it } from "vitest";
 import { resetHouseholdDbForTests } from "@/lib/db";
 import type { InventoryAllocationPayload, InventoryCommandPayload } from "@/lib/db";
@@ -30,40 +30,6 @@ type HouseholdContext = {
   productId: string;
   locationId: string;
 };
-
-function localSupabaseEnv(): { api: string; anon: string } | null {
-  try {
-    const output = execFileSync("npx", ["supabase", "status", "-o", "env"], {
-      encoding: "utf8",
-      timeout: 60_000,
-    });
-    const value = (name: string) =>
-      output.match(new RegExp(`^${name}=(.*)$`, "m"))?.[1]?.replace(/^['"]|['"]$/g, "");
-    const api = value("API_URL") ?? value("SUPABASE_URL") ?? LOCAL_API;
-    const anon = value("ANON_KEY") ?? value("SUPABASE_ANON_KEY");
-    if (!anon) {
-      return null;
-    }
-    if (!api.startsWith("http://127.0.0.1:") && !api.startsWith("http://localhost:")) {
-      return null;
-    }
-    return { api, anon };
-  } catch {
-    return null;
-  }
-}
-
-async function detectLocalSupabase(): Promise<{ api: string; anon: string } | null> {
-  try {
-    const health = await fetch(`${LOCAL_API}/auth/v1/health`);
-    if (!health.ok && health.status !== 200) {
-      return null;
-    }
-  } catch {
-    return null;
-  }
-  return localSupabaseEnv();
-}
 
 const local = await detectLocalSupabase();
 const API = local?.api ?? LOCAL_API;

@@ -37,6 +37,19 @@ test(
     await expect(page.getByText("Kitchen: 1")).toBeVisible();
     await expect(page.getByText("Cellar: 2")).toBeVisible();
 
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    const removeDialog = page.getByRole("dialog", { name: "Remove" });
+    await expect(removeDialog).toBeVisible();
+    await removeDialog.getByLabel("Location").selectOption({ label: "Kitchen" });
+    await removeDialog.getByLabel("Quantity").fill("5");
+    await expect(removeDialog).toBeVisible();
+    await expect(removeDialog.getByText("Not enough stock at that location.")).toBeVisible();
+    await expect(removeDialog.getByRole("button", { name: "Remove", exact: true })).toBeDisabled();
+    await expect(page.getByText("Total: 3")).toBeVisible();
+    await expect(page.getByText("Kitchen: 1")).toBeVisible();
+    await removeDialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(removeDialog).toBeHidden();
+
     await page.getByRole("link", { name: "Back to inventory" }).click();
     await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
     await expect(page.getByText("3 in stock")).toBeVisible();

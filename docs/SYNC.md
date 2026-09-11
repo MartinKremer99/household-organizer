@@ -100,9 +100,10 @@ The following can remain online-only in V1:
 - joining a household
 - household bootstrap
 - initial authentication
-- push notification registration
 - external barcode/product-database lookup
 - future external integrations
+
+Open Food Facts lookup is online-only and is not queued. Catalog commands and household rename use the same outbox/RPC path as inventory and shopping.
 
 Once authenticated and synchronized, the core household workflows should remain usable offline.
 
@@ -683,7 +684,7 @@ Do not continuously hammer Supabase while offline.
 
 The browser's online/offline events can trigger an immediate retry, but they should not be treated as proof that the network request will succeed.
 
-A failed request remains queued.
+A failed request remains queued. Failed outbox rows stay failed; there is no retry/discard UI. The user retries the action.
 
 ---
 

@@ -46,7 +46,7 @@ export function Dialog({ open, title, titleId, onClose, children }: DialogProps)
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="w-full max-w-lg rounded-md border border-foreground/20 bg-background p-4"
+        className="max-h-[min(90dvh,40rem)] w-full max-w-lg overflow-y-auto rounded-md border border-foreground/20 bg-background p-4"
       >
         <h2 id={titleId} className="text-lg font-semibold tracking-tight">
           {title}

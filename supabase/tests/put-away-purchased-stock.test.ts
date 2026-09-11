@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
+import { detectLocalSupabase } from "./local";
 
 const DB = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const COMMAND_SIG =
@@ -14,37 +15,6 @@ type HouseholdContext = {
   productId: string;
   locationId: string;
 };
-
-function localSupabaseEnv(): { api: string; anon: string } | null {
-  try {
-    const output = execFileSync("npx", ["supabase", "status", "-o", "env"], {
-      encoding: "utf8",
-      timeout: 60_000,
-    });
-    const value = (name: string) =>
-      output.match(new RegExp(`^${name}=(.*)$`, "m"))?.[1]?.replace(/^['"]|['"]$/g, "");
-    const api = value("API_URL") ?? value("SUPABASE_URL");
-    const anon = value("ANON_KEY") ?? value("SUPABASE_ANON_KEY");
-    if (!api || !anon) {
-      return null;
-    }
-    return { api, anon };
-  } catch {
-    return null;
-  }
-}
-
-async function detectLocalSupabase(): Promise<{ api: string; anon: string } | null> {
-  try {
-    const health = await fetch("http://127.0.0.1:54321/auth/v1/health");
-    if (!health.ok && health.status !== 200) {
-      return null;
-    }
-  } catch {
-    return null;
-  }
-  return localSupabaseEnv();
-}
 
 const local = await detectLocalSupabase();
 const API = local?.api ?? "http://127.0.0.1:54321";
