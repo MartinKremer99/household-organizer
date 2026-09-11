@@ -14,11 +14,10 @@ import { listActiveLocations } from "@/features/locations/application/manage-loc
 import { ProductBarcodeFields } from "@/features/barcode/ui/product-barcode-fields";
 import { createProduct } from "@/features/products/application/manage-products";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
-import { isLowStock } from "@/lib/domain/products/low-stock";
+import { InventoryProductRow } from "./inventory-product-row";
 
 export type InventoryOverviewScreenApi = {
   listInventoryOverview: typeof listInventoryOverview;
@@ -68,17 +67,14 @@ function buildFilters(
   return Object.keys(filters).length > 0 ? filters : undefined;
 }
 
-function locationLine(item: InventoryOverviewItem): string {
-  return item.locations
-    .map((row) => `${row.location_name ?? "Unknown location"} ${row.quantity}`)
-    .join(" · ");
-}
-
 function CategoryRequiredHint() {
   return (
-    <p className="text-sm text-foreground/70">
+    <p className="text-secondary text-muted-foreground">
       A category is required.{" "}
-      <Link href="/settings/categories" className="underline">
+      <Link
+        href="/settings/categories"
+        className="font-medium text-foreground underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
         Settings → Categories
       </Link>
     </p>
@@ -208,11 +204,11 @@ export function InventoryOverviewScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold tracking-tight">Inventory</h1>
+      <h1 className="text-title font-semibold tracking-tight">Inventory</h1>
 
       {showHeaderAdd ? (
         <div className="flex flex-col gap-2">
-          <Button type="button" onClick={openCreate}>
+          <Button type="button" variant="secondary" onClick={openCreate}>
             Add product
           </Button>
           {noCategories ? <CategoryRequiredHint /> : null}
@@ -270,23 +266,23 @@ export function InventoryOverviewScreen({
       ) : null}
 
       {phase === "loading" ? (
-        <p role="status" className="text-sm">
+        <p role="status" className="text-secondary text-muted-foreground">
           Loading inventory…
         </p>
       ) : null}
 
       {phase === "error" && error ? (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="text-body text-danger">
           {error}
         </p>
       ) : null}
 
       {phase === "ready" && items.length === 0 ? (
         filtersActive ? (
-          <p className="text-sm text-foreground/80">No products match these filters.</p>
+          <p className="text-secondary text-muted-foreground">No products match these filters.</p>
         ) : (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-foreground/80">No products yet.</p>
+            <p className="text-secondary text-muted-foreground">No products yet.</p>
             <Button type="button" onClick={openCreate}>
               Add product
             </Button>
@@ -296,28 +292,7 @@ export function InventoryOverviewScreen({
       ) : null}
 
       {phase === "ready"
-        ? items.map((item) => (
-            <Link
-              key={item.product_id}
-              href={`/inventory/${item.product_id}`}
-              aria-label={item.product_name}
-              className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-            >
-              <Card title={item.product_name}>
-                <p>{item.category_name ?? "Unknown category"}</p>
-                <p>
-                  {item.total_quantity === 0
-                    ? "Out of stock"
-                    : `${item.total_quantity} in stock`}
-                </p>
-                {item.minimum_stock > 0 ? <p>Min {item.minimum_stock}</p> : null}
-                {isLowStock(item.total_quantity, item.minimum_stock) ? (
-                  <p>Low stock</p>
-                ) : null}
-                {locationLine(item) ? <p>{locationLine(item)}</p> : null}
-              </Card>
-            </Link>
-          ))
+        ? items.map((item) => <InventoryProductRow key={item.product_id} item={item} />)
         : null}
 
       <Dialog
@@ -330,7 +305,7 @@ export function InventoryOverviewScreen({
       >
         {editor ? (
           <form
-            className="flex flex-col gap-3"
+            className="flex min-w-0 flex-col gap-3"
             onSubmit={(event) => {
               event.preventDefault();
               void handleCreate();
@@ -378,7 +353,7 @@ export function InventoryOverviewScreen({
             />
             {noCategories ? <CategoryRequiredHint /> : null}
             {formError ? (
-              <p role="alert" className="text-sm">
+              <p role="alert" className="text-body text-danger">
                 {formError}
               </p>
             ) : null}

@@ -14,7 +14,6 @@ import {
   type ProductInventory,
 } from "@/features/inventory/application/read-inventory";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
@@ -324,77 +323,92 @@ export function InventoryProductScreen({
     <div className="flex flex-col gap-4">
       <Link
         href="/inventory"
-        className="text-sm font-medium underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        className="inline-flex min-h-11 items-center text-label font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         Back to inventory
       </Link>
 
       {phase === "loading" ? (
-        <p role="status" className="text-sm">
+        <p role="status" className="text-secondary text-muted-foreground">
           Loading inventory…
         </p>
       ) : null}
 
       {phase === "error" && error ? (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="text-body text-danger">
           {error}
         </p>
       ) : null}
 
       {phase === "missing" ? (
-        <p className="text-sm text-foreground/80">
+        <p className="text-secondary text-muted-foreground">
           This product is not in your inventory.
         </p>
       ) : null}
 
       {phase === "ready" && product ? (
         <>
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="text-title font-semibold tracking-tight">
             {product.product_name}
           </h1>
-          <p className="text-sm">{product.category_name ?? "Unknown category"}</p>
-          <p className="text-sm">
+          <p className="text-label text-muted-foreground">
+            {product.category_name ?? "Unknown category"}
+          </p>
+          {product.barcode ? (
+            <p className="text-label text-muted-foreground">{product.barcode}</p>
+          ) : null}
+          <p className="text-numeric font-semibold tabular-nums text-foreground">
             {product.total_quantity === 0
               ? "Out of stock"
               : `Total: ${product.total_quantity}`}
           </p>
-          {product.minimum_stock > 0 ? (
-            <p className="text-sm">Min {product.minimum_stock}</p>
-          ) : null}
-          {product.barcode ? <p className="text-sm">{product.barcode}</p> : null}
           {isLowStock(product.total_quantity, product.minimum_stock) ? (
-            <p className="text-sm">Low stock</p>
+            <p className="text-label font-medium text-warning">Low stock</p>
+          ) : null}
+          {product.minimum_stock > 0 ? (
+            <p className="text-label text-muted-foreground">Min {product.minimum_stock}</p>
           ) : null}
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={openAdd}>
               Add stock
             </Button>
-            <Button type="button" variant="secondary" onClick={openRemove}>
-              Remove
-            </Button>
             <Button type="button" variant="secondary" onClick={openMove}>
               Move
             </Button>
+            <Button type="button" variant="danger" onClick={openRemove}>
+              Remove
+            </Button>
           </div>
 
-          <Card title="Locations">
-            {product.locations.length === 0 ? null : (
-              <ul className="flex flex-col gap-1">
+          <section>
+            <h2 className="text-section font-semibold tracking-tight">Locations</h2>
+            {product.locations.length === 0 ? (
+              <p className="text-secondary text-muted-foreground">
+                No stock in any location.
+              </p>
+            ) : (
+              <ul className="flex flex-col">
                 {product.locations.map((row) => (
-                  <li key={row.location_id}>
-                    {row.location_name ?? "Unknown location"}: {row.quantity}
+                  <li
+                    key={row.location_id}
+                    className="flex min-h-11 items-center justify-between gap-3"
+                  >
+                    <span className="min-w-0 truncate text-card">
+                      {`${row.location_name ?? "Unknown location"}: ${row.quantity}`}
+                    </span>
                   </li>
                 ))}
               </ul>
             )}
-          </Card>
+          </section>
 
-          <Card title="Lots">
+          <section>
+            <h2 className="text-section font-semibold tracking-tight">Lots</h2>
             {product.lots.length === 0 ? (
-              <p>No lots on hand.</p>
+              <p className="text-secondary text-muted-foreground">No lots on hand.</p>
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-3">
                 {product.lots.map((lot) => {
                   const relative =
                     lot.expiration_date && !lot.expired
@@ -402,22 +416,26 @@ export function InventoryProductScreen({
                       : null;
                   return (
                     <li key={lot.lot_id}>
-                      <p>
+                      <p className="text-card">
                         Qty {lot.quantity} at {lot.location_name ?? "Unknown location"}
                       </p>
-                      <p>
+                      <p className="text-label text-muted-foreground">
                         {lot.expiration_date === null
                           ? "No expiration"
                           : lot.expiration_date}
                       </p>
-                      {relative ? <p>{relative}</p> : null}
-                      {lot.expired ? <p>Expired</p> : null}
+                      {relative ? (
+                        <p className="text-label font-medium text-warning">{relative}</p>
+                      ) : null}
+                      {lot.expired ? (
+                        <p className="text-label font-medium text-danger">Expired</p>
+                      ) : null}
                     </li>
                   );
                 })}
               </ul>
             )}
-          </Card>
+          </section>
         </>
       ) : null}
 
@@ -428,7 +446,7 @@ export function InventoryProductScreen({
         onClose={closeDialog}
       >
         <form
-          className="flex flex-col gap-3"
+          className="flex min-w-0 flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             void submitAdd();
@@ -461,7 +479,7 @@ export function InventoryProductScreen({
             onChange={(event) => setAddExpiration(event.target.value)}
           />
           {formError && dialog === "add" ? (
-            <p role="alert" className="text-sm">
+            <p role="alert" className="text-body text-danger">
               {formError}
             </p>
           ) : null}
@@ -483,7 +501,7 @@ export function InventoryProductScreen({
         onClose={closeDialog}
       >
         <form
-          className="flex flex-col gap-3"
+          className="flex min-w-0 flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             void submitRemove();
@@ -536,11 +554,11 @@ export function InventoryProductScreen({
             ))}
           </Select>
           {formError && dialog === "remove" ? (
-            <p role="alert" className="text-sm">
+            <p role="alert" className="text-body text-danger">
               {formError}
             </p>
           ) : removeQuantityValue != null && removeQuantityValue > removeMax ? (
-            <p role="alert" className="text-sm">
+            <p role="alert" className="text-body text-danger">
               {inventoryErrorMessage("insufficient_stock")}
             </p>
           ) : null}
@@ -562,7 +580,7 @@ export function InventoryProductScreen({
         onClose={closeDialog}
       >
         <form
-          className="flex flex-col gap-3"
+          className="flex min-w-0 flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             void submitMove();
@@ -617,7 +635,7 @@ export function InventoryProductScreen({
             ))}
           </Select>
           {sameMoveLocation || (formError && dialog === "move") ? (
-            <p role="alert" className="text-sm">
+            <p role="alert" className="text-body text-danger">
               {formError ?? inventoryErrorMessage("invalid_move")}
             </p>
           ) : null}

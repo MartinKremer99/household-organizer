@@ -179,6 +179,7 @@ describe("InventoryProductScreen", () => {
     );
 
     expect(await screen.findByText("Out of stock")).toBeTruthy();
+    expect(screen.getByText("No stock in any location.")).toBeTruthy();
     expect(screen.getByText("No lots on hand.")).toBeTruthy();
   });
 

@@ -81,7 +81,7 @@ describe("InventoryOverviewScreen", () => {
   it("renders name, category, totals, and location breakdown", async () => {
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={api()} />);
 
-    expect(await screen.findByRole("heading", { name: "Milk" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "Milk" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Milk" }).textContent).toContain("Food");
     expect(screen.getByText("1 in stock")).toBeTruthy();
     expect(screen.getByText("Kitchen 1")).toBeTruthy();
@@ -93,7 +93,7 @@ describe("InventoryOverviewScreen", () => {
   it("shows out of stock for a zero-quantity product", async () => {
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={api()} />);
 
-    expect(await screen.findByRole("heading", { name: "Water" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "Water" })).toBeTruthy();
     expect(screen.getByText("Out of stock")).toBeTruthy();
   });
 
@@ -111,14 +111,14 @@ describe("InventoryOverviewScreen", () => {
     });
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
 
-    expect(await screen.findByRole("heading", { name: "Water" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "Water" })).toBeTruthy();
     expect(screen.queryByText("Low stock")).toBeNull();
   });
 
   it("searches through listInventoryOverview", async () => {
     const inventory = api();
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
 
     fireEvent.change(screen.getByLabelText("Search products"), {
       target: { value: "tom" },
@@ -136,7 +136,7 @@ describe("InventoryOverviewScreen", () => {
   it("passes only selected filter keys", async () => {
     const inventory = api();
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
 
     fireEvent.change(screen.getByLabelText("Category"), {
       target: { value: "cat-1" },
@@ -172,7 +172,7 @@ describe("InventoryOverviewScreen", () => {
   it("clears filters with a one-argument overview call", async () => {
     const inventory = api();
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
 
     fireEvent.change(screen.getByLabelText("Search products"), {
       target: { value: "tom" },
@@ -199,7 +199,7 @@ describe("InventoryOverviewScreen", () => {
         .mockResolvedValueOnce([]),
     });
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
 
     fireEvent.change(screen.getByLabelText("Search products"), {
       target: { value: "zzz" },
@@ -251,7 +251,7 @@ describe("InventoryOverviewScreen", () => {
 
   it("opens the add product dialog from the header when products exist", async () => {
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={api()} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
 
     fireEvent.click(screen.getByRole("button", { name: "Add product" }));
 
@@ -260,7 +260,7 @@ describe("InventoryOverviewScreen", () => {
 
   it("requires name and category and defaults minimum stock to zero", async () => {
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={api()} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
     fireEvent.click(screen.getByRole("button", { name: "Add product" }));
 
     const dialog = within(screen.getByRole("dialog"));
@@ -275,7 +275,7 @@ describe("InventoryOverviewScreen", () => {
       listActiveCategories: vi.fn().mockResolvedValue([]),
     });
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
 
     expect(screen.getByRole("link", { name: /Settings.*Categories/ }).getAttribute("href")).toBe(
       "/settings/categories",
@@ -299,7 +299,7 @@ describe("InventoryOverviewScreen", () => {
         api={inventory}
       />,
     );
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
     fireEvent.click(screen.getByRole("button", { name: "Add product" }));
 
     const dialog = within(screen.getByRole("dialog"));
@@ -332,7 +332,7 @@ describe("InventoryOverviewScreen", () => {
         api={inventory}
       />,
     );
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
     fireEvent.click(screen.getByRole("button", { name: "Add product" }));
 
     const dialog = within(screen.getByRole("dialog"));
@@ -347,7 +347,7 @@ describe("InventoryOverviewScreen", () => {
   it("passes a typed barcode to createProduct", async () => {
     const inventory = api();
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
     fireEvent.click(screen.getByRole("button", { name: "Add product" }));
 
     const dialog = within(screen.getByRole("dialog", { name: "Add product" }));
@@ -375,7 +375,7 @@ describe("InventoryOverviewScreen", () => {
       createProduct: vi.fn().mockResolvedValue({ ok: false, code: "duplicate_barcode" }),
     });
     render(<InventoryOverviewScreen householdId={HOUSEHOLD} api={inventory} />);
-    await screen.findByRole("heading", { name: "Milk" });
+    await screen.findByRole("link", { name: "Milk" });
     fireEvent.click(screen.getByRole("button", { name: "Add product" }));
 
     const dialog = within(screen.getByRole("dialog", { name: "Add product" }));
