@@ -63,8 +63,11 @@ export function NotificationsSettingsCard({
   return (
     <Card title="Notifications">
       <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p>Low stock</p>
+        <div className="flex min-h-11 flex-wrap items-center justify-between gap-2">
+          <p className="text-card font-medium text-foreground">Low stock</p>
+          <p className="text-label font-medium text-foreground">
+            {state.lowStock ? "On" : "Off"}
+          </p>
           <Button
             type="button"
             variant="secondary"
@@ -77,8 +80,11 @@ export function NotificationsSettingsCard({
             Low stock
           </Button>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p>Expiration</p>
+        <div className="flex min-h-11 flex-wrap items-center justify-between gap-2">
+          <p className="text-card font-medium text-foreground">Expiration</p>
+          <p className="text-label font-medium text-foreground">
+            {state.expiration ? "On" : "Off"}
+          </p>
           <Button
             type="button"
             variant="secondary"
@@ -93,16 +99,20 @@ export function NotificationsSettingsCard({
         </div>
 
         {permission === "unsupported" ? (
-          <p>Browser does not support notifications</p>
+          <p className="text-secondary text-foreground">
+            Browser does not support notifications
+          </p>
         ) : (
-          <p>
+          <p className="text-secondary text-foreground">
             Browser notifications:{" "}
             {permission === "granted" ? "Allowed" : "Not permitted"}
           </p>
         )}
 
         {permission === "denied" ? (
-          <p>Notifications were blocked. Use the browser settings to allow them.</p>
+          <p className="text-secondary text-foreground">
+            Notifications were blocked. Use the browser settings to allow them.
+          </p>
         ) : null}
 
         {permission === "default" ? (

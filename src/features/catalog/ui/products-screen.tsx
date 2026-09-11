@@ -13,11 +13,11 @@ import {
 import { listActiveCategories } from "@/features/categories/application/manage-categories";
 import { ProductBarcodeFields } from "@/features/barcode/ui/product-barcode-fields";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import { catalogErrorMessage } from "./catalog-errors";
+import { CatalogRow } from "./catalog-row";
 
 export type ProductsScreenApi = {
   listActiveProducts: typeof listActiveProducts;
@@ -218,7 +218,7 @@ export function ProductsScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold tracking-tight">Products</h1>
+      <h1 className="text-title font-semibold tracking-tight">Products</h1>
 
       <TextField
         id="product-search"
@@ -230,6 +230,7 @@ export function ProductsScreen({
       <div className="flex flex-col gap-2">
         <Button
           type="button"
+          variant={products.length === 0 ? "primary" : "secondary"}
           disabled={categories.length === 0}
           onClick={() => {
             setError(null);
@@ -245,63 +246,75 @@ export function ProductsScreen({
           Add product
         </Button>
         {categories.length === 0 ? (
-          <p className="text-sm text-foreground/70">Add a category first.</p>
+          <p className="text-secondary text-muted-foreground">Add a category first.</p>
         ) : null}
       </div>
 
       {status ? (
-        <p role="status" className="text-sm">
+        <p role="status" className="text-secondary text-muted-foreground">
           {status}
         </p>
       ) : null}
       {error && !editor && !archiveTarget ? (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="text-body text-danger">
           {error}
         </p>
       ) : null}
 
       {products.length === 0 ? (
-        <p className="text-sm text-foreground/80">
+        <p className="text-secondary text-muted-foreground">
           {searching ? "No products found." : "No products yet."}
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col">
           {products.map((product) => (
             <li key={product.id}>
-              <Card title={product.name}>
-                <p>{categoryName(product.category_id)}</p>
-                <p>Min {product.minimum_stock}</p>
-                {product.barcode ? <p>{product.barcode}</p> : null}
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setError(null);
-                      setEditor({
-                        mode: "edit",
-                        product,
-                        name: product.name,
-                        categoryId: product.category_id,
-                        minimumStock: String(product.minimum_stock),
-                        barcode: product.barcode ?? "",
-                      });
-                    }}
-                  >
-                    Edit {product.name}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setError(null);
-                      setArchiveTarget(product);
-                    }}
-                  >
-                    Archive {product.name}
-                  </Button>
-                </div>
-              </Card>
+              <CatalogRow
+                name={product.name}
+                details={
+                  <>
+                    <p className="text-label text-muted-foreground">
+                      {categoryName(product.category_id)}
+                    </p>
+                    <p className="text-label text-muted-foreground">
+                      Min {product.minimum_stock}
+                    </p>
+                    {product.barcode ? (
+                      <p className="font-mono text-label text-muted-foreground">
+                        {product.barcode}
+                      </p>
+                    ) : null}
+                  </>
+                }
+              >
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setError(null);
+                    setEditor({
+                      mode: "edit",
+                      product,
+                      name: product.name,
+                      categoryId: product.category_id,
+                      minimumStock: String(product.minimum_stock),
+                      barcode: product.barcode ?? "",
+                    });
+                  }}
+                >
+                  Edit {product.name}
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => {
+                    setError(null);
+                    setArchiveTarget(product);
+                  }}
+                >
+                  Archive {product.name}
+                </Button>
+              </CatalogRow>
             </li>
           ))}
         </ul>
@@ -315,7 +328,7 @@ export function ProductsScreen({
       >
         {editor ? (
           <form
-            className="flex flex-col gap-3"
+            className="flex min-w-0 flex-col gap-3"
             onSubmit={(event) => {
               event.preventDefault();
               void saveEditor();
@@ -362,7 +375,7 @@ export function ProductsScreen({
               }
             />
             {error ? (
-              <p role="alert" className="text-sm">
+              <p role="alert" className="text-body text-danger">
                 {error}
               </p>
             ) : null}
@@ -389,7 +402,7 @@ export function ProductsScreen({
         onClose={() => setArchiveTarget(null)}
       >
         {error ? (
-          <p role="alert" className="mb-3 text-sm">
+          <p role="alert" className="mb-3 text-body text-danger">
             {error}
           </p>
         ) : null}

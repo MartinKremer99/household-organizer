@@ -16,7 +16,7 @@ export default async function SettingsPage() {
       email={email}
       signOutAction={
         <form action={signOut}>
-          <Button type="submit" variant="secondary">
+          <Button type="submit" variant="danger">
             Sign out
           </Button>
         </form>

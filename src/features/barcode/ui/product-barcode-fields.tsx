@@ -95,7 +95,14 @@ export function ProductBarcodeFields({
         Scan barcode
       </Button>
       {status ? (
-        <p role="status" className="text-sm">
+        <p
+          role={status === "Looking up product…" ? "status" : "alert"}
+          className={
+            status === "Looking up product…"
+              ? "text-secondary text-muted-foreground"
+              : "text-body text-danger"
+          }
+        >
           {status}
         </p>
       ) : null}

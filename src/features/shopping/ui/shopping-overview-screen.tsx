@@ -16,11 +16,11 @@ import {
   putAwayPurchasedStock,
 } from "@/features/shopping/application/manage-shopping";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Select } from "@/components/ui/select";
 import { TextField } from "@/components/ui/text-field";
 import { shoppingErrorMessage } from "./shopping-errors";
+import { ShoppingRow } from "./shopping-row";
 
 export type ShoppingOverviewScreenApi = {
   listPendingShoppingItems: typeof listPendingShoppingItems;
@@ -359,9 +359,12 @@ export function ShoppingOverviewScreen({
     await refreshShopping();
   }
 
+  const tabClass = (selected: boolean) =>
+    selected ? "relative font-semibold" : undefined;
+
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold tracking-tight">Shopping</h1>
+      <h1 className="text-title font-semibold tracking-tight">Shopping</h1>
       <Button type="button" onClick={openAdd}>
         Add
       </Button>
@@ -370,74 +373,92 @@ export function ShoppingOverviewScreen({
         <Button
           type="button"
           role="tab"
-          variant={tab === "buy" ? "primary" : "secondary"}
+          id="shopping-tab-buy"
+          variant="secondary"
           aria-selected={tab === "buy"}
+          aria-controls="shopping-panel-buy"
+          className={tabClass(tab === "buy")}
           onClick={() => setTab("buy")}
         >
+          {tab === "buy" ? (
+            <span className="absolute inset-x-3 bottom-0 h-0.5 bg-primary" aria-hidden="true" />
+          ) : null}
           To buy
         </Button>
         <Button
           type="button"
           role="tab"
-          variant={tab === "purchased" ? "primary" : "secondary"}
+          id="shopping-tab-purchased"
+          variant="secondary"
           aria-selected={tab === "purchased"}
+          aria-controls="shopping-panel-purchased"
+          className={tabClass(tab === "purchased")}
           onClick={() => setTab("purchased")}
         >
+          {tab === "purchased" ? (
+            <span className="absolute inset-x-3 bottom-0 h-0.5 bg-primary" aria-hidden="true" />
+          ) : null}
           Purchased ({purchasedCount})
         </Button>
       </div>
 
       {phase === "loading" ? (
-        <p role="status" className="text-sm">
+        <p role="status" className="text-secondary text-muted-foreground">
           Loading shopping…
         </p>
       ) : null}
 
       {error ? (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="text-body text-danger">
           {error}
         </p>
       ) : null}
 
       {phase === "ready" && tab === "buy" ? (
-        <div role="tabpanel">
+        <div
+          role="tabpanel"
+          id="shopping-panel-buy"
+          aria-labelledby="shopping-tab-buy"
+        >
           {pendingItems.length === 0 ? (
-            <p className="text-sm text-foreground/80">Nothing to buy.</p>
+            <p className="text-secondary text-muted-foreground">Nothing to buy.</p>
           ) : (
             pendingItems.map((item) => {
               const name = itemName(item);
               return (
-                <Card key={item.id} title={name}>
-                  {item.free_text ? <p>Note</p> : null}
-                  <p>{item.quantity}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      aria-label={`Decrease ${name} quantity`}
-                      disabled={pending || item.quantity <= 1}
-                      onClick={() => void changeQuantity(item, item.quantity - 1)}
-                    >
-                      −
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      aria-label={`Increase ${name} quantity`}
-                      disabled={pending}
-                      onClick={() => void changeQuantity(item, item.quantity + 1)}
-                    >
-                      +
-                    </Button>
-                    <Button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => void markPurchased(item)}
-                    >
-                      Mark {name} purchased
-                    </Button>
-                  </div>
-                </Card>
+                <ShoppingRow
+                  key={item.id}
+                  name={name}
+                  quantity={item.quantity}
+                  showNote={item.free_text !== null}
+                >
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    aria-label={`Decrease ${name} quantity`}
+                    disabled={pending || item.quantity <= 1}
+                    onClick={() => void changeQuantity(item, item.quantity - 1)}
+                  >
+                    −
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    aria-label={`Increase ${name} quantity`}
+                    disabled={pending}
+                    onClick={() => void changeQuantity(item, item.quantity + 1)}
+                  >
+                    +
+                  </Button>
+                  <Button
+                    type="button"
+                    className="w-full whitespace-normal"
+                    disabled={pending}
+                    onClick={() => void markPurchased(item)}
+                  >
+                    Mark {name} purchased
+                  </Button>
+                </ShoppingRow>
               );
             })
           )}
@@ -445,51 +466,57 @@ export function ShoppingOverviewScreen({
       ) : null}
 
       {phase === "ready" && tab === "purchased" ? (
-        <div role="tabpanel">
+        <div
+          role="tabpanel"
+          id="shopping-panel-purchased"
+          aria-labelledby="shopping-tab-purchased"
+        >
           {purchasedStock.length === 0 && purchasedFreeText.length === 0 ? (
-            <p className="text-sm text-foreground/80">Nothing waiting to be stored.</p>
+            <p className="text-secondary text-muted-foreground">
+              Nothing waiting to be stored.
+            </p>
           ) : null}
           {purchasedStock.map((row) => {
             const name = productName(row.product_id);
             return (
-              <Card key={row.product_id} title={name}>
-                <p>{row.quantity} remaining</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => openPutAway(row)}
-                  >
-                    Put away {name}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    disabled={pending}
-                    onClick={() => openConsume(row)}
-                  >
-                    Consume {name}
-                  </Button>
-                </div>
-              </Card>
+              <ShoppingRow
+                key={row.product_id}
+                name={name}
+                quantity={`${row.quantity} remaining`}
+              >
+                <Button
+                  type="button"
+                  className="whitespace-normal"
+                  disabled={pending}
+                  onClick={() => openPutAway(row)}
+                >
+                  Put away {name}
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  className="whitespace-normal"
+                  disabled={pending}
+                  onClick={() => openConsume(row)}
+                >
+                  Consume {name}
+                </Button>
+              </ShoppingRow>
             );
           })}
           {purchasedFreeText.map((item) => {
             const name = item.free_text ?? "Note";
             return (
-              <Card key={item.id} title={name}>
-                <p>Note</p>
-                <p>{item.quantity}</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => void markStored(item)}
-                  >
-                    Mark {name} stored
-                  </Button>
-                </div>
-              </Card>
+              <ShoppingRow key={item.id} name={name} quantity={item.quantity} showNote>
+                <Button
+                  type="button"
+                  className="w-full whitespace-normal"
+                  disabled={pending}
+                  onClick={() => void markStored(item)}
+                >
+                  Mark {name} stored
+                </Button>
+              </ShoppingRow>
             );
           })}
         </div>
@@ -502,7 +529,7 @@ export function ShoppingOverviewScreen({
         onClose={closeDialog}
       >
         <form
-          className="flex flex-col gap-3"
+          className="flex min-w-0 flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             void submitAdd();
@@ -511,18 +538,26 @@ export function ShoppingOverviewScreen({
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              variant={addMode === "product" ? "primary" : "secondary"}
+              variant="secondary"
               aria-pressed={addMode === "product"}
+              className={tabClass(addMode === "product")}
               onClick={() => setAddMode("product")}
             >
+              {addMode === "product" ? (
+                <span className="absolute inset-x-3 bottom-0 h-0.5 bg-primary" aria-hidden="true" />
+              ) : null}
               Product
             </Button>
             <Button
               type="button"
-              variant={addMode === "freeText" ? "primary" : "secondary"}
+              variant="secondary"
               aria-pressed={addMode === "freeText"}
+              className={tabClass(addMode === "freeText")}
               onClick={() => setAddMode("freeText")}
             >
+              {addMode === "freeText" ? (
+                <span className="absolute inset-x-3 bottom-0 h-0.5 bg-primary" aria-hidden="true" />
+              ) : null}
               Free text
             </Button>
           </div>
@@ -556,7 +591,7 @@ export function ShoppingOverviewScreen({
             onChange={(event) => setAddQuantity(event.target.value)}
           />
           {formError && dialog === "add" ? (
-            <p role="alert" className="text-sm">
+            <p role="alert" className="text-body text-danger">
               {formError}
             </p>
           ) : null}
@@ -581,7 +616,7 @@ export function ShoppingOverviewScreen({
         onClose={closeDialog}
       >
         <form
-          className="flex flex-col gap-3"
+          className="flex min-w-0 flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             void submitPutAway();
@@ -614,7 +649,7 @@ export function ShoppingOverviewScreen({
             onChange={(event) => setPutAwayExpiration(event.target.value)}
           />
           {formError && dialog === "putAway" ? (
-            <p role="alert" className="text-sm">
+            <p role="alert" className="text-body text-danger">
               {formError}
             </p>
           ) : null}
@@ -636,7 +671,7 @@ export function ShoppingOverviewScreen({
         onClose={closeDialog}
       >
         <form
-          className="flex flex-col gap-3"
+          className="flex min-w-0 flex-col gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             void submitConsume();
@@ -650,7 +685,7 @@ export function ShoppingOverviewScreen({
             onChange={(event) => setConsumeQuantity(event.target.value)}
           />
           {formError && dialog === "consume" ? (
-            <p role="alert" className="text-sm">
+            <p role="alert" className="text-body text-danger">
               {formError}
             </p>
           ) : null}

@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_NOTIFICATION_STATE } from "@/features/notifications/application/notification-store";
 import {
@@ -25,6 +25,10 @@ function renderCard(control: NotificationsSettingsCardApi = api()) {
   return render(<NotificationsSettingsCard householdId={HOUSEHOLD} api={control} />);
 }
 
+function toggleRow(name: "Low stock" | "Expiration") {
+  return screen.getByRole("button", { name }).closest("div")!;
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -38,6 +42,8 @@ describe("NotificationsSettingsCard", () => {
     expect(screen.queryByRole("button", { name: "Enable notifications" })).toBeNull();
     expect(screen.getByRole("button", { name: "Low stock" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("button", { name: "Expiration" })).toHaveProperty("disabled", true);
+    expect(within(toggleRow("Low stock")).getByText("Off")).toBeTruthy();
+    expect(within(toggleRow("Expiration")).getByText("Off")).toBeTruthy();
   });
 
   it("shows not permitted and does not request permission on mount", () => {
@@ -90,6 +96,7 @@ describe("NotificationsSettingsCard", () => {
 
     const lowStock = screen.getByRole("button", { name: "Low stock" });
     expect(lowStock.getAttribute("aria-pressed")).toBe("false");
+    expect(within(toggleRow("Low stock")).getByText("Off")).toBeTruthy();
     fireEvent.click(lowStock);
 
     await waitFor(() => {
@@ -101,6 +108,7 @@ describe("NotificationsSettingsCard", () => {
       expect(evaluateHouseholdNotifications).toHaveBeenCalledWith(HOUSEHOLD);
     });
     expect(lowStock.getAttribute("aria-pressed")).toBe("true");
+    expect(within(toggleRow("Low stock")).getByText("On")).toBeTruthy();
 
     fireEvent.click(lowStock);
     await waitFor(() => {
@@ -111,5 +119,6 @@ describe("NotificationsSettingsCard", () => {
       });
     });
     expect(evaluateHouseholdNotifications).toHaveBeenCalledTimes(1);
+    expect(within(toggleRow("Low stock")).getByText("Off")).toBeTruthy();
   });
 });

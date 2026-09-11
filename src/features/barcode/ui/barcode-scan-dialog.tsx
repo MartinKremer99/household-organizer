@@ -120,16 +120,19 @@ export function BarcodeScanDialog({
         {supported ? (
           <video
             ref={videoRef}
+            aria-label="Barcode camera preview"
             className="h-48 w-full rounded-md bg-foreground/10 object-cover"
             muted
             playsInline
             autoPlay
           />
         ) : (
-          <p>This browser cannot scan barcodes.</p>
+          <p role="alert" className="text-body text-danger">
+            This browser cannot scan barcodes.
+          </p>
         )}
         {error ? (
-          <p role="status" className="text-sm">
+          <p role="alert" className="text-body text-danger">
             {error}
           </p>
         ) : null}

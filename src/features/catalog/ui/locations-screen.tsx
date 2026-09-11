@@ -8,10 +8,10 @@ import {
   renameLocation,
 } from "@/features/locations/application/manage-locations";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { TextField } from "@/components/ui/text-field";
 import { catalogErrorMessage } from "./catalog-errors";
+import { CatalogRow } from "./catalog-row";
 
 export type LocationsScreenApi = {
   listActiveLocations: typeof listActiveLocations;
@@ -119,9 +119,10 @@ export function LocationsScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold tracking-tight">Locations</h1>
+      <h1 className="text-title font-semibold tracking-tight">Locations</h1>
       <Button
         type="button"
+        variant={locations.length === 0 ? "primary" : "secondary"}
         onClick={() => {
           setError(null);
           setEditor({ mode: "create", name: "" });
@@ -130,50 +131,48 @@ export function LocationsScreen({
         Add location
       </Button>
       {status ? (
-        <p role="status" className="text-sm">
+        <p role="status" className="text-secondary text-muted-foreground">
           {status}
         </p>
       ) : null}
       {error && !editor && !archiveTarget ? (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="text-body text-danger">
           {error}
         </p>
       ) : null}
 
       {locations.length === 0 ? (
-        <p className="text-sm text-foreground/80">No locations yet.</p>
+        <p className="text-secondary text-muted-foreground">No locations yet.</p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col">
           {locations.map((location) => (
             <li key={location.id}>
-              <Card title={location.name}>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setError(null);
-                      setEditor({
-                        mode: "edit",
-                        location,
-                        name: location.name,
-                      });
-                    }}
-                  >
-                    Rename {location.name}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setError(null);
-                      setArchiveTarget(location);
-                    }}
-                  >
-                    Archive {location.name}
-                  </Button>
-                </div>
-              </Card>
+              <CatalogRow name={location.name}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setError(null);
+                    setEditor({
+                      mode: "edit",
+                      location,
+                      name: location.name,
+                    });
+                  }}
+                >
+                  Rename {location.name}
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => {
+                    setError(null);
+                    setArchiveTarget(location);
+                  }}
+                >
+                  Archive {location.name}
+                </Button>
+              </CatalogRow>
             </li>
           ))}
         </ul>
@@ -187,7 +186,7 @@ export function LocationsScreen({
       >
         {editor ? (
           <form
-            className="flex flex-col gap-3"
+            className="flex min-w-0 flex-col gap-3"
             onSubmit={(event) => {
               event.preventDefault();
               void saveEditor();
@@ -202,7 +201,7 @@ export function LocationsScreen({
               }
             />
             {error ? (
-              <p role="alert" className="text-sm">
+              <p role="alert" className="text-body text-danger">
                 {error}
               </p>
             ) : null}
@@ -229,7 +228,7 @@ export function LocationsScreen({
         onClose={() => setArchiveTarget(null)}
       >
         {error ? (
-          <p role="alert" className="mb-3 text-sm">
+          <p role="alert" className="mb-3 text-body text-danger">
             {error}
           </p>
         ) : null}

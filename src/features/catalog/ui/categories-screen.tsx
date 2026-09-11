@@ -8,10 +8,10 @@ import {
   renameCategory,
 } from "@/features/categories/application/manage-categories";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { TextField } from "@/components/ui/text-field";
 import { catalogErrorMessage } from "./catalog-errors";
+import { CatalogRow } from "./catalog-row";
 
 export type CategoriesScreenApi = {
   listActiveCategories: typeof listActiveCategories;
@@ -119,9 +119,10 @@ export function CategoriesScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold tracking-tight">Categories</h1>
+      <h1 className="text-title font-semibold tracking-tight">Categories</h1>
       <Button
         type="button"
+        variant={categories.length === 0 ? "primary" : "secondary"}
         onClick={() => {
           setError(null);
           setEditor({ mode: "create", name: "" });
@@ -130,50 +131,48 @@ export function CategoriesScreen({
         Add category
       </Button>
       {status ? (
-        <p role="status" className="text-sm">
+        <p role="status" className="text-secondary text-muted-foreground">
           {status}
         </p>
       ) : null}
       {error && !editor && !archiveTarget ? (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="text-body text-danger">
           {error}
         </p>
       ) : null}
 
       {categories.length === 0 ? (
-        <p className="text-sm text-foreground/80">No categories yet.</p>
+        <p className="text-secondary text-muted-foreground">No categories yet.</p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col">
           {categories.map((category) => (
             <li key={category.id}>
-              <Card title={category.name}>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setError(null);
-                      setEditor({
-                        mode: "edit",
-                        category,
-                        name: category.name,
-                      });
-                    }}
-                  >
-                    Rename {category.name}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      setError(null);
-                      setArchiveTarget(category);
-                    }}
-                  >
-                    Archive {category.name}
-                  </Button>
-                </div>
-              </Card>
+              <CatalogRow name={category.name}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setError(null);
+                    setEditor({
+                      mode: "edit",
+                      category,
+                      name: category.name,
+                    });
+                  }}
+                >
+                  Rename {category.name}
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => {
+                    setError(null);
+                    setArchiveTarget(category);
+                  }}
+                >
+                  Archive {category.name}
+                </Button>
+              </CatalogRow>
             </li>
           ))}
         </ul>
@@ -187,7 +186,7 @@ export function CategoriesScreen({
       >
         {editor ? (
           <form
-            className="flex flex-col gap-3"
+            className="flex min-w-0 flex-col gap-3"
             onSubmit={(event) => {
               event.preventDefault();
               void saveEditor();
@@ -202,7 +201,7 @@ export function CategoriesScreen({
               }
             />
             {error ? (
-              <p role="alert" className="text-sm">
+              <p role="alert" className="text-body text-danger">
                 {error}
               </p>
             ) : null}
@@ -229,7 +228,7 @@ export function CategoriesScreen({
         onClose={() => setArchiveTarget(null)}
       >
         {error ? (
-          <p role="alert" className="mb-3 text-sm">
+          <p role="alert" className="mb-3 text-body text-danger">
             {error}
           </p>
         ) : null}

@@ -117,14 +117,14 @@ export function HouseholdSettingsScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
+      <h1 className="text-title font-semibold tracking-tight">Settings</h1>
       {status ? (
-        <p role="status" className="text-sm">
+        <p role="status" className="text-secondary text-muted-foreground">
           {status}
         </p>
       ) : null}
       {error && editorName === null ? (
-        <p role="alert" className="text-sm">
+        <p role="alert" className="text-body text-danger">
           {error}
         </p>
       ) : null}
@@ -133,12 +133,12 @@ export function HouseholdSettingsScreen({
         {household ? (
           <div className="flex flex-col gap-3">
             <p>
-              <span className="text-foreground/70">Name </span>
-              {household.name}
+              <span className="text-muted-foreground">Name </span>
+              <span className="text-foreground">{household.name}</span>
             </p>
             <div className="flex flex-col gap-2">
-              <p className="text-foreground/70">Join code</p>
-              <p className="select-all font-mono text-base tracking-wide text-foreground">
+              <p className="text-muted-foreground">Join code</p>
+              <p className="break-all select-all font-mono text-base tracking-wide text-foreground">
                 {household.join_code}
               </p>
               <Button type="button" variant="secondary" onClick={() => void copyJoinCode()}>
@@ -157,15 +157,15 @@ export function HouseholdSettingsScreen({
             </Button>
           </div>
         ) : (
-          <p>Loading household…</p>
+          <p className="text-secondary text-muted-foreground">Loading household…</p>
         )}
       </Card>
 
       <Card title="Account">
         <div className="flex flex-col gap-3">
           <p>
-            <span className="text-foreground/70">Email </span>
-            {email}
+            <span className="text-muted-foreground">Email </span>
+            <span className="text-foreground">{email}</span>
           </p>
           {signOutAction}
         </div>
@@ -176,23 +176,32 @@ export function HouseholdSettingsScreen({
       <Link
         href="/settings/products"
         aria-label="Products"
-        className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        className="block min-h-11 min-w-0 rounded-control py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
-        <Card title="Products">Manage household products.</Card>
+        <span className="block text-card font-medium text-foreground">Products</span>
+        <span className="block text-label text-muted-foreground">
+          Manage household products.
+        </span>
       </Link>
       <Link
         href="/settings/categories"
         aria-label="Categories"
-        className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        className="block min-h-11 min-w-0 rounded-control py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
-        <Card title="Categories">Manage household categories.</Card>
+        <span className="block text-card font-medium text-foreground">Categories</span>
+        <span className="block text-label text-muted-foreground">
+          Manage household categories.
+        </span>
       </Link>
       <Link
         href="/settings/locations"
         aria-label="Locations"
-        className="block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        className="block min-h-11 min-w-0 rounded-control py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
-        <Card title="Locations">Manage household locations.</Card>
+        <span className="block text-card font-medium text-foreground">Locations</span>
+        <span className="block text-label text-muted-foreground">
+          Manage household locations.
+        </span>
       </Link>
 
       <Dialog
@@ -203,7 +212,7 @@ export function HouseholdSettingsScreen({
       >
         {editorName !== null ? (
           <form
-            className="flex flex-col gap-3"
+            className="flex min-w-0 flex-col gap-3"
             onSubmit={(event) => {
               event.preventDefault();
               void saveName();
@@ -216,7 +225,7 @@ export function HouseholdSettingsScreen({
               onChange={(event) => setEditorName(event.target.value)}
             />
             {error ? (
-              <p role="alert" className="text-sm">
+              <p role="alert" className="text-body text-danger">
                 {error}
               </p>
             ) : null}
