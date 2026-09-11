@@ -46,6 +46,7 @@ describe("HouseholdSettingsScreen", () => {
     expect(screen.getByText("ABCDEFGHIJ")).toBeTruthy();
     expect(screen.getByText("member@example.test")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Notifications" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Products" }).getAttribute("href")).toBe(
       "/settings/products",
     );

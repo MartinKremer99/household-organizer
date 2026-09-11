@@ -3,13 +3,17 @@ import { expect, type Page } from "@playwright/test";
 export async function createProductFromInventory(
   page: Page,
   name: string,
+  options?: { minimumStock?: number },
 ): Promise<void> {
-  await page.getByRole("link", { name: "Inventory" }).click();
+  await page.getByRole("link", { name: "Inventory", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
   await page.getByRole("button", { name: "Add product" }).click();
   const dialog = page.getByRole("dialog", { name: "Add product" });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("Name").fill(name);
+  if (options?.minimumStock != null) {
+    await dialog.getByLabel("Minimum stock").fill(String(options.minimumStock));
+  }
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name, exact: true, level: 1 })).toBeVisible();
 }
@@ -61,7 +65,7 @@ export async function removeStock(
 }
 
 export async function openProductFromInventory(page: Page, name: string): Promise<void> {
-  await page.getByRole("link", { name: "Inventory" }).click();
+  await page.getByRole("link", { name: "Inventory", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Inventory" })).toBeVisible();
   await page.getByRole("link", { name, exact: true }).click();
   await expect(page.getByRole("heading", { name, exact: true, level: 1 })).toBeVisible();

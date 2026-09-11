@@ -18,4 +18,16 @@ describe("HouseholdHydrationGate source", () => {
     expect(source).not.toMatch(/outbox/);
     expect(source).not.toMatch(/uploader/);
   });
+
+  it("chrome evaluates notifications without requesting permission", () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "household-app-chrome.tsx"),
+      "utf8",
+    );
+
+    expect(source).toMatch(/evaluateHouseholdNotifications/);
+    expect(source).not.toMatch(/requestPermission/);
+    expect(source).not.toMatch(/dexie/i);
+    expect(source).not.toMatch(/@\/lib\/db/);
+  });
 });

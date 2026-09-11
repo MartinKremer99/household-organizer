@@ -51,6 +51,7 @@ function api(overrides: Partial<SyncStatusControlApi> = {}): SyncStatusControlAp
   return {
     loadSyncStatus: vi.fn().mockResolvedValue(neverSynced),
     runHouseholdSync: vi.fn().mockResolvedValue(undefined),
+    evaluateHouseholdNotifications: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -177,6 +178,49 @@ describe("SyncStatusControl", () => {
     expect(
       screen.getByText("Could not apply a change. Check quantities and try again."),
     ).toBeTruthy();
+  });
+
+  it("evaluates notifications after Sync now resolves, not on pathname reload or throw", async () => {
+    const evaluateHouseholdNotifications = vi.fn().mockResolvedValue(undefined);
+    const loadSyncStatus = vi.fn().mockResolvedValue(synced);
+    const { rerender } = renderControl(
+      api({ loadSyncStatus, evaluateHouseholdNotifications }),
+    );
+
+    await screen.findByText("Synced");
+    expect(evaluateHouseholdNotifications).not.toHaveBeenCalled();
+
+    vi.mocked(usePathname).mockReturnValue("/shopping");
+    rerender(
+      <SyncStatusControl
+        householdId={HOUSEHOLD}
+        api={api({ loadSyncStatus, evaluateHouseholdNotifications })}
+      />,
+    );
+    await waitFor(() => {
+      expect(loadSyncStatus).toHaveBeenCalledTimes(2);
+    });
+    expect(evaluateHouseholdNotifications).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    await waitFor(() => {
+      expect(evaluateHouseholdNotifications).toHaveBeenCalledWith(HOUSEHOLD);
+    });
+
+    const failing = api({
+      loadSyncStatus: vi.fn().mockResolvedValue(synced),
+      runHouseholdSync: vi.fn().mockRejectedValue(new Error("offline")),
+      evaluateHouseholdNotifications,
+    });
+    cleanup();
+    renderControl(failing);
+    await screen.findByText("Synced");
+    evaluateHouseholdNotifications.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Sync now" }));
+    await waitFor(() => {
+      expect(failing.runHouseholdSync).toHaveBeenCalled();
+    });
+    expect(evaluateHouseholdNotifications).not.toHaveBeenCalled();
   });
 
   it("shows the network failure sentence after a transient refresh", async () => {

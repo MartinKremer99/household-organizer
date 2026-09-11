@@ -8,7 +8,7 @@ import {
 
 export async function openUserContext(
   browser: Browser,
-  options?: { permissions?: ("clipboard-read" | "clipboard-write")[] },
+  options?: { permissions?: ("clipboard-read" | "clipboard-write" | "notifications")[] },
 ): Promise<{
   context: BrowserContext;
   page: Page;

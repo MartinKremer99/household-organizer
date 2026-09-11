@@ -24,3 +24,25 @@ export async function copyJoinCode(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Copy join code" }).click();
   await expect(page.getByText("Copied.", { exact: true })).toBeVisible();
 }
+
+export async function expectNotificationsCard(page: Page): Promise<void> {
+  await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible();
+}
+
+export async function enableBrowserNotifications(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Enable notifications" }).click();
+}
+
+export async function setNotificationPreference(
+  page: Page,
+  name: "Low stock" | "Expiration",
+  enabled: boolean,
+): Promise<void> {
+  const toggle = page.getByRole("button", { name, exact: true });
+  await expect(toggle).toBeEnabled();
+  const pressed = await toggle.getAttribute("aria-pressed");
+  if ((pressed === "true") !== enabled) {
+    await toggle.click();
+  }
+  await expect(toggle).toHaveAttribute("aria-pressed", enabled ? "true" : "false");
+}

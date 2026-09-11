@@ -10,6 +10,7 @@ import {
   getLocalHousehold,
   renameHousehold,
 } from "@/features/household/application/manage-household";
+import { NotificationsSettingsCard } from "@/features/notifications/ui/notifications-settings-card";
 import { useHouseholdNameRefresh } from "./household-app-chrome";
 import { householdSettingsErrorMessage } from "./household-settings-errors";
 
@@ -169,6 +170,8 @@ export function HouseholdSettingsScreen({
           {signOutAction}
         </div>
       </Card>
+
+      <NotificationsSettingsCard householdId={householdId} />
 
       <Link
         href="/settings/products"

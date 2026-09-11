@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { evaluateHouseholdNotifications } from "@/features/notifications/application/evaluate-notifications";
 import { loadSyncStatus, type SyncStatusView } from "@/features/sync/application/load-sync-status";
 import { runHouseholdSync } from "@/features/sync/application/run-household-sync";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,13 @@ import { syncStatusErrorMessage } from "./sync-errors";
 export type SyncStatusControlApi = {
   loadSyncStatus: typeof loadSyncStatus;
   runHouseholdSync: typeof runHouseholdSync;
+  evaluateHouseholdNotifications: typeof evaluateHouseholdNotifications;
 };
 
 const defaults: SyncStatusControlApi = {
   loadSyncStatus,
   runHouseholdSync,
+  evaluateHouseholdNotifications,
 };
 
 const LABELS: Record<SyncStatusView["label"], string> = {
@@ -74,6 +77,7 @@ export function SyncStatusControl({
       await client.runHouseholdSync();
       const next = await client.loadSyncStatus(householdId);
       setView(next);
+      await client.evaluateHouseholdNotifications(householdId);
     } catch {
       setView((current) => current ?? EMPTY);
     } finally {

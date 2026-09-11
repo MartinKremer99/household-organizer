@@ -24,7 +24,7 @@ export function HouseholdHydrationGate({
   userId: string;
   children: ReactNode;
   api?: Partial<HouseholdHydrationGateApi>;
-  onReady?: (household: { name: string }) => void;
+  onReady?: (household: { id: string; name: string }) => void;
 }) {
   const ensure = api?.ensureLocalHousehold ?? defaults.ensureLocalHousehold;
   const [attempt, setAttempt] = useState(0);
