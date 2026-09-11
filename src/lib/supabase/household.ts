@@ -1,6 +1,7 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 
-export async function getOwnHouseholdId(): Promise<string | null> {
+export const getOwnHouseholdId = cache(async (): Promise<string | null> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("household_members")
@@ -12,4 +13,4 @@ export async function getOwnHouseholdId(): Promise<string | null> {
   }
 
   return data.household_id;
-}
+});

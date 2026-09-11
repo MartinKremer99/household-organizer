@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getOwnHouseholdId } from "@/lib/supabase/household";
-import { createClient } from "@/lib/supabase/server";
-import { getLiveUserId } from "@/lib/supabase/session";
+import { getLiveUserIdFromCookies } from "@/lib/supabase/session";
 
 export async function requireHouseholdId(): Promise<string> {
   const householdId = await getOwnHouseholdId();
@@ -16,8 +15,7 @@ export async function requireHouseholdActor(): Promise<{
   userId: string;
 }> {
   const householdId = await requireHouseholdId();
-  const supabase = await createClient();
-  const userId = await getLiveUserId(supabase.auth);
+  const userId = await getLiveUserIdFromCookies();
   if (!userId) {
     redirect("/login");
   }
