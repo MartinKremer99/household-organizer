@@ -11,9 +11,9 @@
   --muted: #efebe2;
   --border: #d4cfc3;
   --foreground: #1c1b16;
-  --muted-foreground: #6a6558;
+  --muted-foreground: #575247;
   --success: #2f6b4f;
-  --warning: #9a6b1c;
+  --warning: #7a5416;
   --danger: #9b2c2c;
   --info: #3a5566;
   --control-radius: 6px;
@@ -27,7 +27,6 @@
   --color-surface-elevated: var(--surface-elevated);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
   --color-muted: var(--muted);
   --color-border: var(--border);
   --color-foreground: var(--foreground);

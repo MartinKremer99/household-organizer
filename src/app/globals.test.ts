@@ -13,7 +13,10 @@ describe("design tokens", () => {
     expect(css).toContain("--surface: #fffcf7");
     expect(css).toContain("--primary: #243126");
     expect(css).toContain("--danger: #9b2c2c");
-    expect(css).toContain("--muted-foreground: #6a6558");
+    expect(css).toContain("--muted-foreground: #575247");
+    expect(css).toContain("--warning: #7a5416");
+    expect(css).toContain("--text-secondary: 0.8125rem");
+    expect(css).not.toContain("--color-secondary:");
     expect(css).toContain("--radius-control: var(--control-radius)");
   });
 });
