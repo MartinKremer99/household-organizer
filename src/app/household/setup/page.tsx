@@ -21,7 +21,10 @@ export default async function HouseholdSetupPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-4 py-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+    <main
+      id="main-content"
+      className="flex min-h-dvh flex-col items-center justify-start gap-6 overflow-y-auto px-4 py-6 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+    >
       <h1 className="text-pretty text-title font-semibold tracking-tight">Set up household</h1>
       <section className="flex w-full max-w-sm flex-col gap-4">
         <h2 className="text-section font-semibold">Create a household</h2>

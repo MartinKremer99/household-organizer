@@ -27,7 +27,10 @@ export function AppShell({ actions, status, identity, children }: AppShellProps)
         </div>
         <NetworkStatus />
       </header>
-      <main className="flex-1 px-4 py-3 pb-[calc(3.75rem+env(safe-area-inset-bottom))]">
+      <main
+        id="main-content"
+        className="flex-1 px-4 py-3 pb-[calc(3.75rem+env(safe-area-inset-bottom))]"
+      >
         {children}
       </main>
       <BottomNav />

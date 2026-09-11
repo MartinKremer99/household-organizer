@@ -117,7 +117,7 @@ export function HouseholdSettingsScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-title font-semibold tracking-tight">Settings</h1>
+      <h1 className="text-pretty text-title font-semibold tracking-tight">Settings</h1>
       {status ? (
         <p role="status" className="text-secondary text-muted-foreground">
           {status}
@@ -165,7 +165,7 @@ export function HouseholdSettingsScreen({
         <div className="flex flex-col gap-3">
           <p>
             <span className="text-muted-foreground">Email </span>
-            <span className="text-foreground">{email}</span>
+            <span className="break-all text-foreground">{email}</span>
           </p>
           {signOutAction}
         </div>

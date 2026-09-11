@@ -119,7 +119,7 @@ export function LocationsScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-title font-semibold tracking-tight">Locations</h1>
+      <h1 className="text-pretty text-title font-semibold tracking-tight">Locations</h1>
       <Button
         type="button"
         variant={locations.length === 0 ? "primary" : "secondary"}

@@ -51,8 +51,10 @@ export function HouseholdHydrationGate({
 
   if (result && !result.ok) {
     return (
-      <div className="space-y-3 p-4">
-        <p role="status">Could not load household</p>
+      <div className="flex flex-col gap-3">
+        <p role="alert" className="text-body text-danger">
+          Could not load household
+        </p>
         <Button
           type="button"
           onClick={() => {
@@ -67,7 +69,7 @@ export function HouseholdHydrationGate({
   }
 
   return (
-    <p role="status" className="p-4">
+    <p role="status" className="text-secondary text-muted-foreground">
       Loading household…
     </p>
   );

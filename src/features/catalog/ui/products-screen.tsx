@@ -218,7 +218,7 @@ export function ProductsScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-title font-semibold tracking-tight">Products</h1>
+      <h1 className="text-pretty text-title font-semibold tracking-tight">Products</h1>
 
       <TextField
         id="product-search"

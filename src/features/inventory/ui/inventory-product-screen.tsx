@@ -348,7 +348,7 @@ export function InventoryProductScreen({
 
       {phase === "ready" && product ? (
         <>
-          <h1 className="text-title font-semibold tracking-tight">
+          <h1 className="min-w-0 break-words text-title font-semibold tracking-tight">
             {product.product_name}
           </h1>
           <p className="text-label text-muted-foreground">
@@ -394,7 +394,7 @@ export function InventoryProductScreen({
                     key={row.location_id}
                     className="flex min-h-11 items-center justify-between gap-3"
                   >
-                    <span className="min-w-0 truncate text-card">
+                    <span className="min-w-0 truncate text-card tabular-nums">
                       {`${row.location_name ?? "Unknown location"}: ${row.quantity}`}
                     </span>
                   </li>
@@ -416,7 +416,7 @@ export function InventoryProductScreen({
                       : null;
                   return (
                     <li key={lot.lot_id}>
-                      <p className="text-card">
+                      <p className="text-card tabular-nums">
                         Qty {lot.quantity} at {lot.location_name ?? "Unknown location"}
                       </p>
                       <p className="text-label text-muted-foreground">

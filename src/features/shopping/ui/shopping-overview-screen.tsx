@@ -364,7 +364,7 @@ export function ShoppingOverviewScreen({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-title font-semibold tracking-tight">Shopping</h1>
+      <h1 className="text-pretty text-title font-semibold tracking-tight">Shopping</h1>
       <Button type="button" onClick={openAdd}>
         Add
       </Button>

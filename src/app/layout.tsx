@@ -37,6 +37,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       style={{ colorScheme: "light" }}
     >
       <body className="min-h-full flex flex-col">
+        <a
+          href="#main-content"
+          className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:top-2 focus-visible:left-2 focus-visible:z-30 focus-visible:inline-flex focus-visible:min-h-11 focus-visible:items-center focus-visible:rounded-control focus-visible:bg-surface focus-visible:px-3 focus-visible:text-body focus-visible:font-medium focus-visible:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          Skip to content
+        </a>
         <PwaRegister />
         {children}
       </body>
