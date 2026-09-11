@@ -30,12 +30,12 @@ test("signed-in PWA chrome stays up offline and does not auto-sync", async ({ br
     await signInAndCreateHousehold(page, "pwa-a");
     await expectHome(page);
     await waitForServiceWorker(page);
-    await expect(page.getByText("Household", { exact: true })).toBeVisible();
+    await expect(page.getByRole("banner", { name: "Household" })).toBeVisible();
 
     log.clear();
     await context.setOffline(true);
     await expect(page.getByText("Offline", { exact: true })).toBeVisible();
-    await expect(page.getByText("Household", { exact: true })).toBeVisible();
+    await expect(page.getByRole("banner", { name: "Household" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
     expect(log.rpcHits("apply_inventory_command")).toEqual([]);
 

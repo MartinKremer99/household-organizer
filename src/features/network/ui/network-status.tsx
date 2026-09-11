@@ -28,7 +28,7 @@ export function NetworkStatus() {
 
   if (label === "offline") {
     return (
-      <p className="text-xs" role="status">
+      <p className="px-4 py-1 text-secondary text-warning" role="status">
         Offline
       </p>
     );
@@ -36,7 +36,7 @@ export function NetworkStatus() {
 
   if (label === "back_online") {
     return (
-      <p className="text-xs" role="status">
+      <p className="px-4 py-1 text-secondary text-muted-foreground" role="status">
         Back online
       </p>
     );

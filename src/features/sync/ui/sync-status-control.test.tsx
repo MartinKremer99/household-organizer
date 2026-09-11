@@ -80,14 +80,15 @@ describe("SyncStatusControl", () => {
     renderControl(api({ loadSyncStatus: vi.fn().mockResolvedValue(synced) }));
 
     expect(await screen.findByText("Synced")).toBeTruthy();
-    expect(screen.getByText("Last synced 2026-09-09 10:00")).toBeTruthy();
+    const timestamp = screen.getByText("Last synced 2026-09-09 10:00");
+    expect(timestamp.className).toContain("sr-only");
   });
 
   it("renders pending changes", async () => {
     renderControl(api({ loadSyncStatus: vi.fn().mockResolvedValue(pending) }));
 
     expect(await screen.findByText("Pending changes")).toBeTruthy();
-    expect(screen.getByText("Last synced 2026-09-09 10:00")).toBeTruthy();
+    expect(screen.getByText("Last synced 2026-09-09 10:00").className).toContain("sr-only");
   });
 
   it("renders failed state with mapped copy and no raw code", async () => {
@@ -95,9 +96,9 @@ describe("SyncStatusControl", () => {
 
     expect(await screen.findByText("Sync failed")).toBeTruthy();
     expect(
-      screen.getByText("Could not apply a change. Check quantities and try again."),
-    ).toBeTruthy();
-    expect(screen.getByText("Last synced 2026-09-08 09:15")).toBeTruthy();
+      screen.getByText("Could not apply a change. Check quantities and try again.").className,
+    ).toContain("sr-only");
+    expect(screen.getByText("Last synced 2026-09-08 09:15").className).toContain("sr-only");
     expect(screen.queryByText(/insufficient_stock/)).toBeNull();
   });
 

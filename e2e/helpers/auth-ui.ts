@@ -31,7 +31,7 @@ export async function signInAs(page: Page, user: RegisteredUser): Promise<void> 
 export async function expectHome(page: Page): Promise<void> {
   await expect(page.getByText("Loading household…")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Home", exact: true })).toBeVisible();
-  await expect(page.getByText("Household", { exact: true })).toBeVisible();
+  await expect(page.getByRole("banner", { name: "Household" })).toBeVisible();
   await expect(page.getByText("Loading home…")).toHaveCount(0);
 }
 

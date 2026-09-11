@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { evaluateHouseholdNotifications } from "@/features/notifications/application/evaluate-notifications";
 import { loadSyncStatus, type SyncStatusView } from "@/features/sync/application/load-sync-status";
 import { runHouseholdSync } from "@/features/sync/application/run-household-sync";
@@ -46,6 +46,7 @@ export function SyncStatusControl({
   api?: Partial<SyncStatusControlApi>;
 }) {
   const pathname = usePathname();
+  const detailId = useId();
   const client = useMemo(() => ({ ...defaults, ...api }), [api]);
   const [view, setView] = useState<SyncStatusView | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -85,27 +86,45 @@ export function SyncStatusControl({
     }
   }
 
+  const lastSynced = !syncing && view?.last_sync_at ? formatLastSynced(view.last_sync_at) : null;
+  const failure =
+    !syncing && view?.label === "failed"
+      ? syncStatusErrorMessage({ kind: view.error_kind, code: view.error_code })
+      : null;
+  const detailIds = [lastSynced ? `${detailId}-synced` : null, failure ? `${detailId}-error` : null]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="flex min-w-0 flex-col items-start gap-1">
+    <div className="flex shrink-0 items-center gap-2">
       {syncing ? (
-        <p className="text-xs" role="status">
+        <p className="text-secondary text-muted-foreground" role="status">
           Syncing…
         </p>
       ) : view ? (
-        <p className="text-xs">{LABELS[view.label]}</p>
+        <p
+          className="text-secondary text-muted-foreground"
+          role="status"
+          aria-describedby={detailIds || undefined}
+        >
+          {LABELS[view.label]}
+        </p>
       ) : null}
-      {!syncing && view?.last_sync_at ? (
-        <p className="text-xs text-foreground/70">{formatLastSynced(view.last_sync_at)}</p>
+      {lastSynced ? (
+        <p id={`${detailId}-synced`} className="sr-only">
+          {lastSynced}
+        </p>
       ) : null}
-      {!syncing && view?.label === "failed" ? (
-        <p className="text-xs text-foreground/70">
-          {syncStatusErrorMessage({ kind: view.error_kind, code: view.error_code })}
+      {failure ? (
+        <p id={`${detailId}-error`} className="sr-only">
+          {failure}
         </p>
       ) : null}
       <Button
         variant="secondary"
         disabled={syncing}
         aria-busy={syncing}
+        aria-describedby={detailIds || undefined}
         onClick={() => {
           void onSyncNow();
         }}

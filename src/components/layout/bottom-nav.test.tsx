@@ -29,11 +29,11 @@ vi.mock("next/link", () => ({
 }));
 
 function anchors(html: string) {
-  return [...html.matchAll(/<a\b([^>]*)>([^<]*)<\/a>/g)].map((match) => {
+  return [...html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map((match) => {
     const attrs = match[1];
     return {
       href: attrs.match(/href="([^"]*)"/)?.[1] ?? "",
-      label: match[2],
+      label: match[2].replace(/<[^>]+>/g, "").trim(),
       current: /aria-current="page"/.test(attrs),
     };
   });
@@ -61,13 +61,30 @@ describe("BottomNav", () => {
     ]);
   });
 
-  it("sets aria-current only on the exact active path", () => {
-    vi.mocked(usePathname).mockReturnValue("/inventory");
+  it("marks Inventory current for inventory detail routes", () => {
+    vi.mocked(usePathname).mockReturnValue("/inventory/prod-1");
     const links = anchors(renderToStaticMarkup(<BottomNav />));
 
     expect(links.find((link) => link.href === "/")?.current).toBe(false);
     expect(links.find((link) => link.href === "/inventory")?.current).toBe(true);
     expect(links.find((link) => link.href === "/shopping")?.current).toBe(false);
+  });
+
+  it("does not treat unrelated routes as Home or Shopping", () => {
+    vi.mocked(usePathname).mockReturnValue("/settings");
+    const links = anchors(renderToStaticMarkup(<BottomNav />));
+
+    expect(links.find((link) => link.href === "/")?.current).toBe(false);
+    expect(links.find((link) => link.href === "/inventory")?.current).toBe(false);
+    expect(links.find((link) => link.href === "/shopping")?.current).toBe(false);
+  });
+
+  it("marks Shopping current for shopping subpaths", () => {
+    vi.mocked(usePathname).mockReturnValue("/shopping/purchased");
+    const links = anchors(renderToStaticMarkup(<BottomNav />));
+
+    expect(links.find((link) => link.href === "/shopping")?.current).toBe(true);
+    expect(links.find((link) => link.href === "/inventory")?.current).toBe(false);
   });
 });
 

@@ -11,19 +11,23 @@ export type AppShellProps = {
 
 export function AppShell({ actions, status, identity, children }: AppShellProps) {
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col overflow-x-hidden">
-      <header className="flex items-center justify-between gap-3 border-b border-foreground/15 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
-        <div className="flex min-w-0 flex-col gap-1">
-          <p className="text-sm font-medium">Household</p>
-          {identity ? (
-            <p className="truncate text-xs text-foreground/70">{identity}</p>
-          ) : null}
-          <NetworkStatus />
-          {status}
+    <div className="mx-auto flex min-h-dvh w-full min-w-0 max-w-lg flex-col overflow-x-hidden">
+      <header
+        aria-label="Household"
+        className="min-w-0 border-b border-border bg-surface pt-[env(safe-area-inset-top)]"
+      >
+        <div className="flex min-w-0 items-center justify-between gap-3 px-4 py-2">
+          <p className="min-w-0 flex-1 truncate text-card font-medium">
+            {identity ?? "Household"}
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            {status}
+            {actions}
+          </div>
         </div>
-        {actions}
+        <NetworkStatus />
       </header>
-      <main className="flex-1 px-4 py-4 pb-[calc(2.75rem+env(safe-area-inset-bottom)+1rem)]">
+      <main className="flex-1 px-4 py-3 pb-[calc(3.75rem+env(safe-area-inset-bottom))]">
         {children}
       </main>
       <BottomNav />
