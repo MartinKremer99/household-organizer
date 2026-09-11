@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { mapHouseholdError } from "@/lib/supabase/household-errors";
 import { getOwnHouseholdId } from "@/lib/supabase/household";
+import {
+  clearHouseholdIdCookie,
+  setHouseholdIdCookie,
+} from "@/lib/supabase/household-cookie";
 import { createClient } from "@/lib/supabase/server";
 import { getLiveUserId } from "@/lib/supabase/session";
 
@@ -43,8 +47,13 @@ export async function signIn(
     return { error: mapAuthError(error.code) };
   }
 
+  await clearHouseholdIdCookie();
   revalidatePath("/", "layout");
   const householdId = await getOwnHouseholdId();
+  const userId = householdId ? await getLiveUserId(supabase.auth) : null;
+  if (householdId && userId) {
+    await setHouseholdIdCookie(userId, householdId);
+  }
   redirect(householdId ? "/" : "/household/setup");
 }
 
@@ -70,6 +79,10 @@ export async function createHousehold(
     return { error: mapHouseholdError(error.message) };
   }
 
+  const householdId = await getOwnHouseholdId();
+  if (householdId) {
+    await setHouseholdIdCookie(userId, householdId);
+  }
   revalidatePath("/", "layout");
   redirect("/");
 }
@@ -96,12 +109,17 @@ export async function joinHousehold(
     return { error: mapHouseholdError(error.message) };
   }
 
+  const householdId = await getOwnHouseholdId();
+  if (householdId) {
+    await setHouseholdIdCookie(userId, householdId);
+  }
   revalidatePath("/", "layout");
   redirect("/");
 }
 
 export async function signOut() {
   const supabase = await createClient();
+  await clearHouseholdIdCookie();
   await supabase.auth.signOut();
 
   revalidatePath("/", "layout");

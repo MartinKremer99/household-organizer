@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { clearHouseholdIdCookieOnResponse } from "@/lib/supabase/household-cookie";
 
 function withCopiedCookies(from: NextResponse, to: NextResponse) {
   from.cookies.getAll().forEach((cookie) => {
@@ -18,7 +19,7 @@ export async function updateSession(request: NextRequest) {
     }
     const login = request.nextUrl.clone();
     login.pathname = "/login";
-    return NextResponse.redirect(login);
+    return clearHouseholdIdCookieOnResponse(NextResponse.redirect(login));
   }
 
   let supabaseResponse = NextResponse.next({ request });
@@ -56,13 +57,19 @@ export async function updateSession(request: NextRequest) {
   if (!isAuthenticated && !isPublicAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return withCopiedCookies(supabaseResponse, NextResponse.redirect(url));
+    return clearHouseholdIdCookieOnResponse(
+      withCopiedCookies(supabaseResponse, NextResponse.redirect(url)),
+    );
   }
 
   if (isAuthenticated && isPublicAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return withCopiedCookies(supabaseResponse, NextResponse.redirect(url));
+  }
+
+  if (!isAuthenticated) {
+    return clearHouseholdIdCookieOnResponse(supabaseResponse);
   }
 
   return supabaseResponse;

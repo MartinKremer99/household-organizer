@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { LoadingIndicator } from "@/components/ui/loading-indicator";
 import {
   ensureLocalHousehold,
   type EnsureLocalHouseholdResult,
@@ -68,9 +69,5 @@ export function HouseholdHydrationGate({
     );
   }
 
-  return (
-    <p role="status" className="text-secondary text-muted-foreground">
-      Loading household…
-    </p>
-  );
+  return <LoadingIndicator label="Loading household…" />;
 }

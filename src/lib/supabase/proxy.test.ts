@@ -32,6 +32,7 @@ describe("updateSession", () => {
     expect(response.status).toBeGreaterThanOrEqual(300);
     expect(response.status).toBeLessThan(400);
     expect(response.headers.get("location")).toContain("/login");
+    expect(response.cookies.get("ho_household_id")?.value).toBe("");
   });
 
   it("leaves login reachable when Supabase env is missing", async () => {
