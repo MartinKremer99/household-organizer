@@ -82,6 +82,28 @@ describe("Dialog", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it("does not steal input focus when onClose identity changes", () => {
+    const { rerender } = render(
+      <Dialog open title="Add product" titleId="add-product-title" onClose={vi.fn()}>
+        <input id="dialog-name" aria-label="Name" />
+        <button type="button">Save</button>
+      </Dialog>,
+    );
+
+    const name = screen.getByLabelText("Name");
+    name.focus();
+    expect(document.activeElement).toBe(name);
+
+    rerender(
+      <Dialog open title="Add product" titleId="add-product-title" onClose={vi.fn()}>
+        <input id="dialog-name" aria-label="Name" />
+        <button type="button">Save</button>
+      </Dialog>,
+    );
+
+    expect(document.activeElement).toBe(name);
+  });
+
   it("keeps Tab inside the dialog", () => {
     render(
       <Dialog open title="Add product" titleId="add-product-title" onClose={vi.fn()}>

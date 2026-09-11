@@ -85,9 +85,12 @@ describe("ProductsScreen", () => {
     await screen.findByText("No products yet.");
 
     fireEvent.click(screen.getByRole("button", { name: "Add product" }));
-    fireEvent.change(screen.getByLabelText("Name"), {
+    const name = screen.getByLabelText("Name");
+    name.focus();
+    fireEvent.change(name, {
       target: { value: "Oats" },
     });
+    expect(document.activeElement).toBe(name);
     fireEvent.change(screen.getByLabelText("Minimum stock"), {
       target: { value: "1" },
     });
